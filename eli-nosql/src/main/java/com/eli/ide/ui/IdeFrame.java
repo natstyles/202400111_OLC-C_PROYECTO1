@@ -5,6 +5,10 @@ import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.io.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.Document;
+
 
 public class IdeFrame extends JFrame {
 
@@ -12,10 +16,22 @@ public class IdeFrame extends JFrame {
     private final JTextArea console = new JTextArea();
     private final JTable outputTable;
     private File currentFile = null;
+    private boolean dirty = false; //hay cambios sin guardar
+    private boolean suppressDirty = false;
+    private DocumentListener dirtyListener;
+    private Document attachedDocument; //saber a cuál documento está pegado el listener
+
 
     public IdeFrame() {
         super("ELI-NOSQL");
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                if (confirmDiscardIfNeeded()) dispose();
+            }
+        });
+
         setSize(1100, 700);
         setLocationRelativeTo(null);
 
@@ -25,6 +41,9 @@ public class IdeFrame extends JFrame {
         editor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         JScrollPane editorScroll = new JScrollPane(editor);
         editorScroll.setBorder(new TitledBorder("Editor"));
+        installDirtyTracking();
+        updateTitle();
+
 
         //Consola
         console.setEditable(false); //No puedan escribir
@@ -46,6 +65,8 @@ public class IdeFrame extends JFrame {
         mainSplit.setResizeWeight(0.6);
 
         add(mainSplit, BorderLayout.CENTER);
+
+        updateTitle();
     }
 
     //barra superior
@@ -82,50 +103,120 @@ public class IdeFrame extends JFrame {
         return bar;
     }
 
+    private void installDirtyTracking() {
+        if (attachedDocument != null && dirtyListener != null) {
+            attachedDocument.removeDocumentListener(dirtyListener);
+        }
+
+        dirtyListener = new DocumentListener() {
+            private void changed() {
+                if (suppressDirty) return;
+                if (!dirty) {
+                    dirty = true;
+                    updateTitle();
+                }
+            }
+
+            @Override public void insertUpdate(DocumentEvent e) { changed(); }
+            @Override public void removeUpdate(DocumentEvent e) { changed(); }
+            @Override public void changedUpdate(DocumentEvent e) { changed(); }
+        };
+
+        attachedDocument = editor.getDocument();
+        attachedDocument.addDocumentListener(dirtyListener);
+    }
+
+    private void updateTitle() {
+        String name = (currentFile == null) ? "Nuevo archivo" : currentFile.getName();
+        setTitle("ELI NOSQL - " + (dirty ? "*" : "") + name);
+    }
+
+    private boolean confirmDiscardIfNeeded() {
+        if (!dirty) return true;
+
+        int option = JOptionPane.showConfirmDialog(
+                this,
+                "Tienes cambios sin guardar. ¿Deseas guardarlos?",
+                "Cambios sin guardar",
+                JOptionPane.YES_NO_CANCEL_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+
+        if (option == JOptionPane.CANCEL_OPTION || option == JOptionPane.CLOSED_OPTION) return false;
+        if (option == JOptionPane.YES_OPTION) return saveFile(); // si cancela o falla, no continúa
+        return true; // NO = descartar cambios
+    }
+
     //Métodos
     private void newFile() {
-        editor.setText("");
+        if (!confirmDiscardIfNeeded()) return;
+
+        suppressDirty = true;
+        try {
+            editor.setText("");
+        } finally {
+            suppressDirty = false;
+        }
+
+        installDirtyTracking();
         currentFile = null;
-        setTitle("ELI NOSQL - Nuevo archivo");
+        dirty = false;
+        updateTitle();
     }
 
     private void openFile() {
+        if (!confirmDiscardIfNeeded()) return;
+
         JFileChooser chooser = new JFileChooser();
         int result = chooser.showOpenDialog(this);
 
         if (result == JFileChooser.APPROVE_OPTION) {
-            currentFile = chooser.getSelectedFile();
-            try (BufferedReader reader = new BufferedReader(new FileReader(currentFile))) {
-                editor.read(reader, null);
-                setTitle("ELI NOSQL - " + currentFile.getName());
+            File selected = chooser.getSelectedFile();
+
+            try (BufferedReader reader = new BufferedReader(new FileReader(selected))) {
+
+                suppressDirty = true;
+                try {
+                    editor.read(reader, null);
+                } finally {
+                    suppressDirty = false;
+                }
+
+                installDirtyTracking();
+                currentFile = selected;
+                dirty = false;
+                updateTitle();
+
             } catch (IOException ex) {
-                JOptionPane.showMessageDialog(this, "Error al abrir archivo");
+                suppressDirty = false;
+                JOptionPane.showMessageDialog(this, "Error al abrir archivo: " + ex.getMessage());
             }
         }
     }
 
-    private void saveFile() {
-        if (currentFile == null) {
-            saveFileAs();
-            return;
-        }
+    private boolean saveFile() {
+        if (currentFile == null) return saveFileAs();
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(currentFile))) {
             editor.write(writer);
+            dirty = false;
+            updateTitle();
+            return true;
         } catch (IOException ex) {
-            JOptionPane.showMessageDialog(this, "Error al guardar archivo");
+            JOptionPane.showMessageDialog(this, "Error al guardar archivo: " + ex.getMessage());
+            return false;
         }
     }
 
-    private void saveFileAs() {
+    private boolean saveFileAs() {
         JFileChooser chooser = new JFileChooser();
         int result = chooser.showSaveDialog(this);
 
         if (result == JFileChooser.APPROVE_OPTION) {
             currentFile = chooser.getSelectedFile();
-            saveFile();
-            setTitle("ELI NOSQL - " + currentFile.getName());
+            return saveFile();
         }
+        return false;
     }
 
     private void runDemo() {
