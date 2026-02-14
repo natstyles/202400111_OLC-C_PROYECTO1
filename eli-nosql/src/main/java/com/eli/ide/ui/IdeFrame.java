@@ -4,12 +4,14 @@ import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.*;
 
 public class IdeFrame extends JFrame {
 
     private final JTextArea editor = new JTextArea();
     private final JTextArea console = new JTextArea();
     private final JTable outputTable;
+    private File currentFile = null;
 
     public IdeFrame() {
         super("ELI-NOSQL");
@@ -51,18 +53,79 @@ public class IdeFrame extends JFrame {
         JMenuBar bar = new JMenuBar();
 
         JMenu file = new JMenu("Archivo");
-        file.add(new JMenuItem("Nuevo"));
-        file.add(new JMenuItem("Abrir..."));
-        file.add(new JMenuItem("Guardar..."));
+
+        JMenuItem nuevo = new JMenuItem("Nuevo");
+        nuevo.addActionListener(e -> newFile());
+
+        JMenuItem abrir = new JMenuItem("Abrir...");
+        abrir.addActionListener(e -> openFile());
+
+        JMenuItem guardar = new JMenuItem("Guardar");
+        guardar.addActionListener(e -> saveFile());
+
+        JMenuItem guardarComo = new JMenuItem("Guardar como...");
+        guardarComo.addActionListener(e -> saveFileAs());
+
+        file.add(nuevo);
+        file.add(abrir);
+        file.add(guardar);
+        file.add(guardarComo);
 
         JMenu run = new JMenu("Ejecutar");
-        JMenuItem ejecutar = new JMenuItem("Run (demo)");
+        JMenuItem ejecutar = new JMenuItem("Run");
         ejecutar.addActionListener(e -> runDemo());
         run.add(ejecutar);
 
         bar.add(file);
         bar.add(run);
+
         return bar;
+    }
+
+    //Métodos
+    private void newFile() {
+        editor.setText("");
+        currentFile = null;
+        setTitle("ELI NOSQL - Nuevo archivo");
+    }
+
+    private void openFile() {
+        JFileChooser chooser = new JFileChooser();
+        int result = chooser.showOpenDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+            currentFile = chooser.getSelectedFile();
+            try (BufferedReader reader = new BufferedReader(new FileReader(currentFile))) {
+                editor.read(reader, null);
+                setTitle("ELI NOSQL - " + currentFile.getName());
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(this, "Error al abrir archivo");
+            }
+        }
+    }
+
+    private void saveFile() {
+        if (currentFile == null) {
+            saveFileAs();
+            return;
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(currentFile))) {
+            editor.write(writer);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Error al guardar archivo");
+        }
+    }
+
+    private void saveFileAs() {
+        JFileChooser chooser = new JFileChooser();
+        int result = chooser.showSaveDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+            currentFile = chooser.getSelectedFile();
+            saveFile();
+            setTitle("ELI NOSQL - " + currentFile.getName());
+        }
     }
 
     private void runDemo() {
