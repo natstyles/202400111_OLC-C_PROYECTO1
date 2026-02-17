@@ -8,9 +8,8 @@ import java.io.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
-
-import java_cup.runtime.Symbol;          // ✅ para leer tokens
-import analizadores.sym;                // ✅ para nombres de tokens (terminalNames)
+import java_cup.runtime.Symbol;
+import analizadores.sym;
 
 public class IdeFrame extends JFrame {
 
@@ -53,7 +52,7 @@ public class IdeFrame extends JFrame {
 
         //Salida (Tokens)
         outputTable = new JTable(new DefaultTableModel(
-                new Object[]{"Campo", "Valor"}, 0
+                new Object[]{"#", "Lexema", "Tipo", "Línea", "Columna"}, 0
         ));
         JScrollPane outputScroll = new JScrollPane(outputTable);
         outputScroll.setBorder(new TitledBorder("Output"));
@@ -222,34 +221,36 @@ public class IdeFrame extends JFrame {
     //llena la tabla con la lista de tokens
     private void fillTokenTable(String input) {
         DefaultTableModel model = (DefaultTableModel) outputTable.getModel();
-        model.setRowCount(0);//limpiar tabla
+        model.setRowCount(0);
+
+        int contador = 1;
 
         try {
-            analizadores.Lexico lex = new analizadores.Lexico(new StringReader(input));
+            analizadores.Lexico lex = new analizadores.Lexico(new java.io.StringReader(input));
 
             while (true) {
-                Symbol s = lex.next_token();
+                java_cup.runtime.Symbol s = lex.next_token();
                 if (s == null) break;
 
-                if (s.sym == sym.EOF) break;
+                if (s.sym == analizadores.sym.EOF) break;
 
-                String tokenName = (s.sym >= 0 && s.sym < sym.terminalNames.length)
-                        ? sym.terminalNames[s.sym]
+                String tokenName = (s.sym >= 0 && s.sym < analizadores.sym.terminalNames.length)
+                        ? analizadores.sym.terminalNames[s.sym]
                         : ("SYM_" + s.sym);
+
+                String tipo = tipoEnunciado(tokenName);
 
                 String lexema = (s.value == null) ? "" : s.value.toString();
 
                 int linea = s.left;
                 int columna = s.right;
 
-                //Mostrar en 2 columnas token lexema
-                String valor = lexema + "  (L:" + linea + ", C:" + columna + ")";
-                model.addRow(new Object[]{tokenName, valor});
-
-                if (s.sym == sym.EOF) break;
+                model.addRow(new Object[]{contador, lexema, tipo, linea, columna});
+                contador++;
             }
+
         } catch (Exception ex) {
-            model.addRow(new Object[]{"LEX_ERROR", ex.getMessage()});
+            model.addRow(new Object[]{contador, "", "LEX_ERROR", "-", "-"});
         }
     }
 
@@ -275,5 +276,49 @@ public class IdeFrame extends JFrame {
             console.append(">> Error en análisis: " + ex.getMessage() + "\n");
             console.append(">> Tip: prueba export con \"out.json\" o usa doble backslash \\\\ en rutas Windows.\n");
         }
+    }
+
+    //representación del token
+    private String tipoEnunciado(String tokenName) {
+        return switch (tokenName) {
+
+            // Identificador
+            case "ID" -> "id";
+
+            // Tipos de datos
+            case "ENTERO" -> "int";
+            case "DECIMAL" -> "float";
+            case "CADENA" -> "string";
+            case "TRUE", "FALSE" -> "bool";
+            case "NULL" -> "null";
+
+            // Palabras reservadas
+            case "DATABASE", "USE", "TABLE", "READ",
+                 "FIELDS", "FILTER", "STORE", "AT",
+                 "EXPORT", "ADD", "UPDATE", "SET", "CLEAR"
+                    -> "keyword";
+
+            // Operadores relacionales
+            case "IGUAL_IGUAL", "DIFERENTE",
+                 "MAYOR", "MENOR",
+                 "MAYOR_IGUAL", "MENOR_IGUAL"
+                    -> "relational_op";
+
+            // Operadores lógicos
+            case "AND", "OR", "NOT"
+                    -> "logical_op";
+
+            // Símbolos de agrupación
+            case "LLAVE_ABRE", "LLAVE_CIERRA",
+                 "PAR_ABRE", "PAR_CIERRA",
+                 "CORCHETE_ABRE", "CORCHETE_CIERRA"
+                    -> "grouping_symbol";
+
+            // Otros símbolos
+            case "PUNTO_COMA", "COMA", "DOS_PUNTOS"
+                    -> "symbol";
+
+            default -> tokenName;
+        };
     }
 }
