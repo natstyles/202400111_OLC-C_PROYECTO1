@@ -212,10 +212,15 @@ public class Sintactico extends java_cup.runtime.lr_parser {
 
   private java.util.function.Consumer<String> log = null;
 
-  // Constructor adicional para mandar mensajes a tu IDE
-  public Sintactico(java_cup.runtime.Scanner s, java.util.function.Consumer<String> log) {
+  // Para mandar filas a la tabla de ERRORES del IDE
+  private java.util.function.Consumer<String[]> errSink = null;
+
+  public Sintactico(java_cup.runtime.Scanner s,
+                    java.util.function.Consumer<String> log,
+                    java.util.function.Consumer<String[]> errSink) {
     super(s);
     this.log = log;
+    this.errSink = errSink;
   }
 
   private void emit(String msg) {
@@ -223,11 +228,30 @@ public class Sintactico extends java_cup.runtime.lr_parser {
     else System.err.println(msg);
   }
 
+  private void pushErr(String tipo, String desc, Object info) {
+    if (errSink == null) return;
+
+    if (info instanceof java_cup.runtime.Symbol sym) {
+      errSink.accept(new String[]{
+        tipo,
+        desc,
+        String.valueOf(sym.left),
+        String.valueOf(sym.right)
+      });
+    } else {
+      errSink.accept(new String[]{tipo, desc, "-", "-"});
+    }
+  }
+
   public void report_error(String message, Object info) {
-    if (info instanceof Symbol s) {
+    // Mensaje a consola
+    if (info instanceof java_cup.runtime.Symbol s) {
       emit("[SINTACTICO] " + message + " (línea " + s.left + ", columna " + s.right + ")");
+      // Fila a tabla de errores
+      pushErr("Sintáctico", message, info);
     } else {
       emit("[SINTACTICO] " + message);
+      pushErr("Sintáctico", message, info);
     }
   }
 

@@ -8,6 +8,13 @@ import java.io.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
+
+import java.awt.Desktop;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+
 import java_cup.runtime.Symbol;
 import analizadores.sym;
 
@@ -15,7 +22,8 @@ public class IdeFrame extends JFrame {
 
     private final JTextArea editor = new JTextArea();
     private final JTextArea console = new JTextArea();
-    private final JTable outputTable;
+    private final JTable tokensTable;
+    private final JTable errorsTable;
     private File currentFile = null;
     private boolean dirty = false; //hay cambios sin guardar
     private boolean suppressDirty = false;
@@ -51,10 +59,24 @@ public class IdeFrame extends JFrame {
         consoleScroll.setBorder(new TitledBorder("Consola"));
 
         //Salida (Tokens)
-        outputTable = new JTable(new DefaultTableModel(
+        //TOKENS
+        tokensTable = new JTable(new DefaultTableModel(
                 new Object[]{"#", "Lexema", "Tipo", "Línea", "Columna"}, 0
         ));
-        JScrollPane outputScroll = new JScrollPane(outputTable);
+        JScrollPane tokensScroll = new JScrollPane(tokensTable);
+
+        //ERROR
+        errorsTable = new JTable(new DefaultTableModel(
+                new Object[]{"#", "Tipo", "Descripción", "Línea", "Columna"}, 0
+        ));
+        JScrollPane errorsScroll = new JScrollPane(errorsTable);
+
+        //Tabs dentro de Output
+        JTabbedPane outputTabs = new JTabbedPane();
+        outputTabs.addTab("Tokens", tokensScroll);
+        outputTabs.addTab("Errores", errorsScroll);
+
+        JScrollPane outputScroll = new JScrollPane(outputTabs);
         outputScroll.setBorder(new TitledBorder("Output"));
 
         JSplitPane rightSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, consoleScroll, outputScroll);
@@ -77,13 +99,13 @@ public class IdeFrame extends JFrame {
         JMenuItem nuevo = new JMenuItem("Nuevo");
         nuevo.addActionListener(e -> newFile());
 
-        JMenuItem abrir = new JMenuItem("Abrir...");
+        JMenuItem abrir = new JMenuItem("Abrir.");
         abrir.addActionListener(e -> openFile());
 
         JMenuItem guardar = new JMenuItem("Guardar");
         guardar.addActionListener(e -> saveFile());
 
-        JMenuItem guardarComo = new JMenuItem("Guardar como...");
+        JMenuItem guardarComo = new JMenuItem("Guardar como.");
         guardarComo.addActionListener(e -> saveFileAs());
 
         file.add(nuevo);
@@ -98,6 +120,15 @@ public class IdeFrame extends JFrame {
 
         bar.add(file);
         bar.add(run);
+
+        JMenu reportes = new JMenu("Reportes");
+
+        JMenuItem html = new JMenuItem("Generar HTML");
+        html.addActionListener(e -> generarHTMLReport());
+
+        reportes.add(html);
+
+        bar.add(reportes);
 
         return bar;
     }
@@ -218,39 +249,42 @@ public class IdeFrame extends JFrame {
         return false;
     }
 
-    //llena la tabla con la lista de tokens
-    private void fillTokenTable(String input) {
-        DefaultTableModel model = (DefaultTableModel) outputTable.getModel();
-        model.setRowCount(0);
+    //llena la tabla con la lista de tokens + errores léxicos
+    private void fillTokensAndLexErrors(String input) {
+        DefaultTableModel tok = (DefaultTableModel) tokensTable.getModel();
+        DefaultTableModel err = (DefaultTableModel) errorsTable.getModel();
+        tok.setRowCount(0);
+        err.setRowCount(0);
 
-        int contador = 1;
+        int nTok = 1;
+        int nErr = 1;
 
         try {
-            analizadores.Lexico lex = new analizadores.Lexico(new java.io.StringReader(input));
+            analizadores.Lexico lex = new analizadores.Lexico(new StringReader(input));
 
             while (true) {
-                java_cup.runtime.Symbol s = lex.next_token();
+                Symbol s = lex.next_token();
                 if (s == null) break;
+                if (s.sym == sym.EOF) break;
 
-                if (s.sym == analizadores.sym.EOF) break;
-
-                String tokenName = (s.sym >= 0 && s.sym < analizadores.sym.terminalNames.length)
-                        ? analizadores.sym.terminalNames[s.sym]
+                String tokenName = (s.sym >= 0 && s.sym < sym.terminalNames.length)
+                        ? sym.terminalNames[s.sym]
                         : ("SYM_" + s.sym);
 
-                String tipo = tipoEnunciado(tokenName);
-
                 String lexema = (s.value == null) ? "" : s.value.toString();
-
                 int linea = s.left;
                 int columna = s.right;
 
-                model.addRow(new Object[]{contador, lexema, tipo, linea, columna});
-                contador++;
-            }
+                // tabla TOKENS
+                tok.addRow(new Object[]{nTok++, lexema, tipoEnunciado(tokenName), linea, columna});
 
+                // tabla ERRORES
+                if ("ERROR".equals(tokenName)) {
+                    err.addRow(new Object[]{nErr++, "Léxico", lexema, linea, columna});
+                }
+            }
         } catch (Exception ex) {
-            model.addRow(new Object[]{contador, "", "LEX_ERROR", "-", "-"});
+            err.addRow(new Object[]{nErr, "Léxico", ex.getMessage(), "-", "-"});
         }
     }
 
@@ -258,23 +292,35 @@ public class IdeFrame extends JFrame {
         console.setText("");
         String input = editor.getText();
 
-        //Mostrar tokens
-        fillTokenTable(input);
+        // 1) Tokens + errores léxicos
+        fillTokensAndLexErrors(input);
 
-        //Parsear con OTRO lexer
+        // 2) Parse + capturar errores sintácticos
+        DefaultTableModel errModel = (DefaultTableModel) errorsTable.getModel();
+        final int[] nErr = { errModel.getRowCount() + 1 };
+
         try {
-            analizadores.Lexico lexer2 = new analizadores.Lexico(new java.io.StringReader(input));
+            analizadores.Lexico lex2 = new analizadores.Lexico(new StringReader(input));
 
             analizadores.Sintactico parser = new analizadores.Sintactico(
-                    lexer2,
-                    msg -> console.append(msg + "\n")
+                    lex2,
+                    msg -> console.append(msg + "\n"),
+                    row -> { // row = {tipo, desc, lin, col}
+                        errModel.addRow(new Object[]{
+                                nErr[0]++,
+                                row[0],
+                                row[1],
+                                row[2],
+                                row[3]
+                        });
+                    }
             );
 
             parser.parse();
+
             console.append(">> Análisis completado: SIN errores.\n");
         } catch (Exception ex) {
             console.append(">> Error en análisis: " + ex.getMessage() + "\n");
-            console.append(">> Tip: prueba export con \"out.json\" o usa doble backslash \\\\ en rutas Windows.\n");
         }
     }
 
@@ -282,43 +328,103 @@ public class IdeFrame extends JFrame {
     private String tipoEnunciado(String tokenName) {
         return switch (tokenName) {
 
-            // Identificador
             case "ID" -> "id";
-
-            // Tipos de datos
             case "ENTERO" -> "int";
             case "DECIMAL" -> "float";
             case "CADENA" -> "string";
             case "TRUE", "FALSE" -> "bool";
             case "NULL" -> "null";
 
-            // Palabras reservadas
-            case "DATABASE", "USE", "TABLE", "READ",
-                 "FIELDS", "FILTER", "STORE", "AT",
-                 "EXPORT", "ADD", "UPDATE", "SET", "CLEAR"
-                    -> "keyword";
+            //clasificación útil
+            case "DATABASE", "USE", "TABLE", "READ", "FIELDS", "FILTER", "STORE", "AT",
+                 "EXPORT", "ADD", "UPDATE", "SET", "CLEAR" -> "keyword";
 
-            // Operadores relacionales
-            case "IGUAL_IGUAL", "DIFERENTE",
-                 "MAYOR", "MENOR",
-                 "MAYOR_IGUAL", "MENOR_IGUAL"
-                    -> "relational_op";
+            case "IGUAL_IGUAL", "DIFERENTE", "MAYOR", "MENOR", "MAYOR_IGUAL", "MENOR_IGUAL" -> "relational_op";
+            case "AND", "OR", "NOT" -> "logical_op";
 
-            // Operadores lógicos
-            case "AND", "OR", "NOT"
-                    -> "logical_op";
+            case "LLAVE_ABRE", "LLAVE_CIERRA", "PAR_ABRE", "PAR_CIERRA" -> "grouping_symbol";
+            case "PUNTO_COMA", "COMA", "DOS_PUNTOS" -> "symbol";
 
-            // Símbolos de agrupación
-            case "LLAVE_ABRE", "LLAVE_CIERRA",
-                 "PAR_ABRE", "PAR_CIERRA",
-                 "CORCHETE_ABRE", "CORCHETE_CIERRA"
-                    -> "grouping_symbol";
-
-            // Otros símbolos
-            case "PUNTO_COMA", "COMA", "DOS_PUNTOS"
-                    -> "symbol";
+            case "ERROR" -> "error";
 
             default -> tokenName;
         };
+    }
+
+    //reporte html
+    private void generarHTMLReport() {
+        try {
+            DefaultTableModel tok = (DefaultTableModel) tokensTable.getModel();
+            DefaultTableModel err = (DefaultTableModel) errorsTable.getModel();
+
+            String html = buildHTML(tok, err);
+
+            Path dir = Path.of("reportes");
+            Files.createDirectories(dir);
+
+            Path out = dir.resolve("reporte.html");
+            Files.writeString(out, html, StandardCharsets.UTF_8);
+
+            console.append(">> Reporte HTML generado: " + out.toAbsolutePath() + "\n");
+
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().browse(out.toUri());
+            }
+        } catch (Exception ex) {
+            console.append(">> No se pudo generar HTML: " + ex.getMessage() + "\n");
+        }
+    }
+
+    private String buildHTML(DefaultTableModel tok, DefaultTableModel err) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!doctype html><html><head><meta charset='utf-8'>")
+                .append("<title>Reporte ELI-NOSQL</title>")
+                .append("<style>")
+                .append("body{font-family:Arial;margin:20px;} h2{margin-top:30px;}")
+                .append("table{border-collapse:collapse;width:100%;margin-top:10px;}")
+                .append("th,td{border:1px solid #999;padding:8px;text-align:left;}")
+                .append("th{background:#e9f2ff;}")
+                .append("</style></head><body>");
+
+        sb.append("<h1>Reporte ELI-NOSQL</h1>")
+                .append("<p>Generado: ").append(LocalDateTime.now()).append("</p>");
+
+        // TOKENS
+        sb.append("<h2>Tabla de Tokens</h2>");
+        sb.append("<table><tr>");
+        for (int c = 0; c < tok.getColumnCount(); c++) sb.append("<th>").append(tok.getColumnName(c)).append("</th>");
+        sb.append("</tr>");
+        for (int r = 0; r < tok.getRowCount(); r++) {
+            sb.append("<tr>");
+            for (int c = 0; c < tok.getColumnCount(); c++) {
+                Object v = tok.getValueAt(r, c);
+                sb.append("<td>").append(v == null ? "" : escapeHtml(v.toString())).append("</td>");
+            }
+            sb.append("</tr>");
+        }
+        sb.append("</table>");
+
+        // ERRORES
+        sb.append("<h2>Tabla de Errores</h2>");
+        sb.append("<table><tr>");
+        for (int c = 0; c < err.getColumnCount(); c++) sb.append("<th>").append(err.getColumnName(c)).append("</th>");
+        sb.append("</tr>");
+        for (int r = 0; r < err.getRowCount(); r++) {
+            sb.append("<tr>");
+            for (int c = 0; c < err.getColumnCount(); c++) {
+                Object v = err.getValueAt(r, c);
+                sb.append("<td>").append(v == null ? "" : escapeHtml(v.toString())).append("</td>");
+            }
+            sb.append("</tr>");
+        }
+        sb.append("</table>");
+
+        sb.append("</body></html>");
+        return sb.toString();
+    }
+
+    private String escapeHtml(String s) {
+        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+                .replace("\"","&quot;").replace("'","&#39;");
     }
 }
