@@ -9,6 +9,8 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
 
+import java_cup.runtime.Symbol;          // ✅ para leer tokens
+import analizadores.sym;                // ✅ para nombres de tokens (terminalNames)
 
 public class IdeFrame extends JFrame {
 
@@ -20,7 +22,6 @@ public class IdeFrame extends JFrame {
     private boolean suppressDirty = false;
     private DocumentListener dirtyListener;
     private Document attachedDocument; //saber a cuál documento está pegado el listener
-
 
     public IdeFrame() {
         super("ELI-NOSQL");
@@ -44,14 +45,13 @@ public class IdeFrame extends JFrame {
         installDirtyTracking();
         updateTitle();
 
-
         //Consola
         console.setEditable(false); //No puedan escribir
         console.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         JScrollPane consoleScroll = new JScrollPane(console);
         consoleScroll.setBorder(new TitledBorder("Consola"));
 
-        //Salida
+        //Salida (Tokens)
         outputTable = new JTable(new DefaultTableModel(
                 new Object[]{"Campo", "Valor"}, 0
         ));
@@ -219,20 +219,57 @@ public class IdeFrame extends JFrame {
         return false;
     }
 
+    //llena la tabla con la lista de tokens
+    private void fillTokenTable(String input) {
+        DefaultTableModel model = (DefaultTableModel) outputTable.getModel();
+        model.setRowCount(0);//limpiar tabla
+
+        try {
+            analizadores.Lexico lex = new analizadores.Lexico(new StringReader(input));
+
+            while (true) {
+                Symbol s = lex.next_token();
+                if (s == null) break;
+
+                if (s.sym == sym.EOF) break;
+
+                String tokenName = (s.sym >= 0 && s.sym < sym.terminalNames.length)
+                        ? sym.terminalNames[s.sym]
+                        : ("SYM_" + s.sym);
+
+                String lexema = (s.value == null) ? "" : s.value.toString();
+
+                int linea = s.left;
+                int columna = s.right;
+
+                //Mostrar en 2 columnas token lexema
+                String valor = lexema + "  (L:" + linea + ", C:" + columna + ")";
+                model.addRow(new Object[]{tokenName, valor});
+
+                if (s.sym == sym.EOF) break;
+            }
+        } catch (Exception ex) {
+            model.addRow(new Object[]{"LEX_ERROR", ex.getMessage()});
+        }
+    }
+
     private void runDemo() {
         console.setText("");
         String input = editor.getText();
 
+        //Mostrar tokens
+        fillTokenTable(input);
+
+        //Parsear con OTRO lexer
         try {
-            analizadores.Lexico lexer = new analizadores.Lexico(new java.io.StringReader(input));
+            analizadores.Lexico lexer2 = new analizadores.Lexico(new java.io.StringReader(input));
 
             analizadores.Sintactico parser = new analizadores.Sintactico(
-                    lexer,
+                    lexer2,
                     msg -> console.append(msg + "\n")
             );
 
             parser.parse();
-
             console.append(">> Análisis completado: SIN errores.\n");
         } catch (Exception ex) {
             console.append(">> Error en análisis: " + ex.getMessage() + "\n");
