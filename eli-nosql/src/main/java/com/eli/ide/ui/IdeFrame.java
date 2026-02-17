@@ -220,12 +220,23 @@ public class IdeFrame extends JFrame {
     }
 
     private void runDemo() {
-        console.append(">> Ejecutando (demo)...\n");
-        console.append(">> (En Fase 1 aquí invocamos JFlex+CUP)\n\n");
+        console.setText("");
+        String input = editor.getText();
 
-        DefaultTableModel model = (DefaultTableModel) outputTable.getModel();
-        model.setRowCount(0);
-        model.addRow(new Object[]{"status", "ok"});
-        model.addRow(new Object[]{"rows", 0});
+        try {
+            analizadores.Lexico lexer = new analizadores.Lexico(new java.io.StringReader(input));
+
+            analizadores.Sintactico parser = new analizadores.Sintactico(
+                    lexer,
+                    msg -> console.append(msg + "\n")
+            );
+
+            parser.parse();
+
+            console.append(">> Análisis completado: SIN errores.\n");
+        } catch (Exception ex) {
+            console.append(">> Error en análisis: " + ex.getMessage() + "\n");
+            console.append(">> Tip: prueba export con \"out.json\" o usa doble backslash \\\\ en rutas Windows.\n");
+        }
     }
 }

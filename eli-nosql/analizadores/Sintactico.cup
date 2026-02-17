@@ -1,0 +1,146 @@
+package analizadores;
+
+import java_cup.runtime.Symbol;
+
+/* ====== Código del parser: errores a consola del IDE ====== */
+parser code {:
+  private java.util.function.Consumer<String> log = null;
+
+  // Constructor adicional para mandar mensajes a tu IDE
+  public Sintactico(java_cup.runtime.Scanner s, java.util.function.Consumer<String> log) {
+    super(s);
+    this.log = log;
+  }
+
+  private void emit(String msg) {
+    if (log != null) log.accept(msg);
+    else System.err.println(msg);
+  }
+
+  public void report_error(String message, Object info) {
+    if (info instanceof Symbol s) {
+      emit("[SINTACTICO] " + message + " (línea " + s.left + ", columna " + s.right + ")");
+    } else {
+      emit("[SINTACTICO] " + message);
+    }
+  }
+
+  public void report_fatal_error(String message, Object info) {
+    report_error(message, info);
+    throw new RuntimeException(message);
+  }
+:};
+
+/* ====== Scanner ====== */
+scan with {:
+  return ((Lexico)getScanner()).next_token();
+:};
+
+/* ====== TERMINALES (deben coincidir con Lexico.jflex) ====== */
+
+/* keywords */
+terminal DATABASE, USE, TABLE, READ, FIELDS, FILTER, STORE, AT, EXPORT, ADD, UPDATE, SET, CLEAR;
+
+/* tipos / booleanos */
+terminal T_INT, T_STRING, TRUE, FALSE;
+
+/* símbolos */
+terminal LLAVE_ABRE, LLAVE_CIERRA, PAR_ABRE, PAR_CIERRA, COR_ABRE, COR_CIERRA;
+terminal DOS_PUNTOS, PUNTO_COMA, COMA, ASTERISCO;
+
+/* operadores */
+terminal MAYOR_IGUAL, MENOR_IGUAL, IGUAL_IGUAL, DIFERENTE, MAYOR, MENOR;
+terminal AND, OR, NOT;
+terminal IGUAL;
+
+/* literales / identificadores */
+terminal String ID, CADENA, ENTERO, DECIMAL;
+
+/* error token */
+terminal String ERROR;
+
+/* ====== NO TERMINALES ====== */
+non terminal program, stmts, stmt;
+non terminal read_block, fields_stmt, filter_stmt;
+non terminal field_list, id_list, value;
+non terminal expr;
+
+/* PRECEDENCIAS */
+precedence left OR;
+precedence left AND;
+precedence right NOT;
+precedence left IGUAL_IGUAL, DIFERENTE, MAYOR, MENOR, MAYOR_IGUAL, MENOR_IGUAL;
+
+start with program;
+
+%%
+
+program
+  ::= stmts
+  ;
+
+stmts
+  ::= stmts stmt
+   |  /* vacío */
+  ;
+
+/* Instrucciones básicas: todas terminan en ; */
+stmt
+  ::= DATABASE ID PUNTO_COMA
+   |  USE ID PUNTO_COMA
+   |  TABLE ID PUNTO_COMA
+
+   | READ TABLE ID read_block PUNTO_COMA
+
+   |  EXPORT TABLE ID STORE AT CADENA PUNTO_COMA
+
+   |  ADD TABLE ID PUNTO_COMA
+   |  UPDATE TABLE ID SET ID IGUAL value PUNTO_COMA
+   |  CLEAR TABLE ID PUNTO_COMA
+
+   |  ERROR PUNTO_COMA
+  ;
+
+read_block
+  ::= LLAVE_ABRE fields_stmt filter_stmt LLAVE_CIERRA
+  ;
+
+fields_stmt
+  ::= FIELDS DOS_PUNTOS field_list PUNTO_COMA
+  ;
+
+filter_stmt
+  ::= FILTER DOS_PUNTOS expr PUNTO_COMA
+  ;
+
+field_list
+  ::= ASTERISCO
+   |  id_list
+  ;
+
+id_list
+  ::= ID
+   |  id_list COMA ID
+  ;
+
+value
+  ::= CADENA
+   |  ENTERO
+   |  DECIMAL
+   |  TRUE
+   |  FALSE
+   |  ID
+  ;
+
+expr
+  ::= expr OR expr
+   |  expr AND expr
+   |  NOT expr
+   |  PAR_ABRE expr PAR_CIERRA
+   |  ID IGUAL_IGUAL value
+   |  ID DIFERENTE value
+   |  ID MAYOR value
+   |  ID MENOR value
+   |  ID MAYOR_IGUAL value
+   |  ID MENOR_IGUAL value
+  ;
