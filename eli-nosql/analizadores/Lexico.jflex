@@ -59,6 +59,7 @@ LINECMT = "//".*
 /* booleanos */
 "true"       { return sym(sym.TRUE); }
 "false"      { return sym(sym.FALSE); }
+"null"       { return sym(sym.NULL); }
 
 /* ===== Símbolos ===== */
 "{"          { return sym(sym.LLAVE_ABRE); }

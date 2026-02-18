@@ -67,7 +67,7 @@ scan with {:
 terminal DATABASE, USE, TABLE, READ, FIELDS, FILTER, STORE, AT, EXPORT, ADD, UPDATE, SET, CLEAR;
 
 /* tipos / booleanos */
-terminal T_INT, T_STRING, TRUE, FALSE;
+terminal T_INT, T_STRING, TRUE, FALSE, NULL;
 
 /* símbolos */
 terminal LLAVE_ABRE, LLAVE_CIERRA, PAR_ABRE, PAR_CIERRA, COR_ABRE, COR_CIERRA;
@@ -154,7 +154,7 @@ value
    |  DECIMAL
    |  TRUE
    |  FALSE
-   |  ID
+   |  NULL
   ;
 
 expr
