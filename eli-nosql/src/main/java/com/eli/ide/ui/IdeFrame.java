@@ -250,7 +250,9 @@ public class IdeFrame extends JFrame {
     }
 
     //llena la tabla con la lista de tokens + errores léxicos
-    private void fillTokensAndLexErrors(String input) {
+    // llena la tabla con la lista de tokens + errores léxicos
+// retorna true si hubo al menos 1 error léxico
+    private boolean fillTokensAndLexErrors(String input) {
         DefaultTableModel tok = (DefaultTableModel) tokensTable.getModel();
         DefaultTableModel err = (DefaultTableModel) errorsTable.getModel();
         tok.setRowCount(0);
@@ -258,11 +260,28 @@ public class IdeFrame extends JFrame {
 
         int nTok = 1;
         int nErr = 1;
+        boolean hasLexError = false;
 
         try {
             analizadores.Lexico lex = new analizadores.Lexico(new StringReader(input));
 
+            // protección anti-loop (por si algún día el lexer se vuelve a trabar)
+            int guard = 0;
+            final int MAX_TOKENS = 200000;
+
             while (true) {
+                if (guard++ > MAX_TOKENS) {
+                    hasLexError = true;
+                    err.addRow(new Object[]{
+                            nErr++,
+                            "Léxico",
+                            "Se excedió el límite de tokens (" + MAX_TOKENS + "). Posible bucle en el analizador léxico.",
+                            "-",
+                            "-"
+                    });
+                    break;
+                }
+
                 Symbol s = lex.next_token();
                 if (s == null) break;
                 if (s.sym == sym.EOF) break;
@@ -275,8 +294,9 @@ public class IdeFrame extends JFrame {
                 int linea = s.left;
                 int columna = s.right;
 
-                //Si es ERROR léxico → SOLO tabla ERRORES
+                // Si es ERROR léxico → SOLO tabla ERRORES
                 if ("ERROR".equals(tokenName)) {
+                    hasLexError = true;
                     err.addRow(new Object[]{
                             nErr++,
                             "Léxico",
@@ -287,7 +307,7 @@ public class IdeFrame extends JFrame {
                     continue;
                 }
 
-                //Si no es error → tabla TOKENS
+                // Si no es error → tabla TOKENS
                 tok.addRow(new Object[]{
                         nTok++,
                         lexema,
@@ -298,6 +318,7 @@ public class IdeFrame extends JFrame {
             }
 
         } catch (Exception ex) {
+            hasLexError = true;
             err.addRow(new Object[]{
                     nErr++,
                     "Léxico",
@@ -306,6 +327,8 @@ public class IdeFrame extends JFrame {
                     "-"
             });
         }
+
+        return hasLexError;
     }
 
     private void runDemo() {
@@ -313,7 +336,12 @@ public class IdeFrame extends JFrame {
         String input = editor.getText();
 
         // 1) Tokens + errores léxicos
-        fillTokensAndLexErrors(input);
+        // 1) Tokens + errores léxicos
+        boolean hasLexError = fillTokensAndLexErrors(input);
+        if (hasLexError) {
+            console.append(">> Se encontraron errores léxicos. No se ejecutó el análisis sintáctico.\n");
+            return;
+        }
 
         // 2) Parse + capturar errores sintácticos
         DefaultTableModel errModel = (DefaultTableModel) errorsTable.getModel();
