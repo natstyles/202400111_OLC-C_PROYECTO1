@@ -2,93 +2,77 @@ package analizadores;
 
 import java_cup.runtime.Symbol;
 
-/* errores a consola del IDE + tabla de errores */
 parser code {:
-  private java.util.function.Consumer<String> log = null;
+    // Variables para conectar con la Interfaz Grafica
+    private java.util.function.Consumer<String> log = null;
+    private java.util.function.Consumer<String[]> errSink = null;
 
-  // Para mandar filas a la tabla de ERRORES del IDE
-  private java.util.function.Consumer<String[]> errSink = null;
-
-  public Sintactico(java_cup.runtime.Scanner s,
-                    java.util.function.Consumer<String> log,
-                    java.util.function.Consumer<String[]> errSink) {
-    super(s);
-    this.log = log;
-    this.errSink = errSink;
-  }
-
-  private void emit(String msg) {
-    if (log != null) log.accept(msg);
-    else System.err.println(msg);
-  }
-
-  private void pushErr(String tipo, String desc, Object info) {
-    if (errSink == null) return;
-
-    if (info instanceof java_cup.runtime.Symbol sym) {
-      errSink.accept(new String[]{
-        tipo,
-        desc,
-        String.valueOf(sym.left),
-        String.valueOf(sym.right)
-      });
-    } else {
-      errSink.accept(new String[]{tipo, desc, "-", "-"});
+    // -------------------------------------------------------------------------
+    // CONSTRUCTOR PERSONALIZADO (3 Argumentos)
+    // Este es el que busca IdeFrame.java.
+    // Al tener 3 parametros, NO choca con el constructor por defecto de CUP.
+    // -------------------------------------------------------------------------
+    public Sintactico(java_cup.runtime.Scanner s,
+                      java.util.function.Consumer<String> log,
+                      java.util.function.Consumer<String[]> errSink) {
+        super(s); // Llamamos al constructor padre
+        this.log = log;
+        this.errSink = errSink;
     }
-  }
 
-  public void report_error(String message, Object info) {
-    // Mensaje a consola
-    if (info instanceof java_cup.runtime.Symbol s) {
-      emit("[SINTACTICO] " + message + " (línea " + s.left + ", columna " + s.right + ")");
-      // Fila a tabla de errores
-      pushErr("Sintáctico", message, info);
-    } else {
-      emit("[SINTACTICO] " + message);
-      pushErr("Sintáctico", message, info);
+    // Metodo auxiliar para enviar mensajes a la consola del IDE
+    private void emit(String msg) {
+        if (log != null) log.accept(msg);
+        else System.out.println(msg);
     }
-  }
 
-  public void report_fatal_error(String message, Object info) {
-    report_error(message, info);
-    throw new RuntimeException(message);
-  }
-:};
+    // Metodo auxiliar para enviar errores a la tabla de errores del IDE
+    private void pushErr(String tipo, String desc, Object info) {
+        if (errSink == null) return;
+        if (info instanceof java_cup.runtime.Symbol) {
+            java_cup.runtime.Symbol sym = (java_cup.runtime.Symbol) info;
+            errSink.accept(new String[]{ tipo, desc, ""+sym.left, ""+sym.right });
+        } else {
+            errSink.accept(new String[]{tipo, desc, "-", "-"});
+        }
+    }
 
+    // Metodo oficial de CUP para reportar errores
+    public void report_error(String message, Object info) {
+        if (info instanceof java_cup.runtime.Symbol) {
+            java_cup.runtime.Symbol s = (java_cup.runtime.Symbol) info;
+            emit("Error Sintactico: " + message + " [Linea: " + s.left + ", Columna: " + s.right + "]");
+            pushErr("Sintactico", message, info);
+        } else {
+            emit("Error Sintactico: " + message);
+            pushErr("Sintactico", message, info);
+        }
+    }
 
-/* ====== Scanner ====== */
-scan with {:
-  return ((Lexico)getScanner()).next_token();
+    // Metodo para errores fatales
+    public void report_fatal_error(String message, Object info) {
+        report_error("Error Fatal: " + message, info);
+    }
 :};
 
 /* ====== TERMINALES ====== */
-
-/* keywords */
 terminal DATABASE, USE, TABLE, READ, FIELDS, FILTER, STORE, AT, EXPORT, ADD, UPDATE, SET, CLEAR;
-
-/* tipos / booleanos */
-terminal T_INT, T_STRING, TRUE, FALSE, NULL;
-
-/* símbolos */
+terminal T_INT, T_STRING, T_FLOAT, T_BOOL, TRUE, FALSE, NULL;
 terminal LLAVE_ABRE, LLAVE_CIERRA, PAR_ABRE, PAR_CIERRA, COR_ABRE, COR_CIERRA;
 terminal DOS_PUNTOS, PUNTO_COMA, COMA, ASTERISCO;
-
-/* operadores */
 terminal MAYOR_IGUAL, MENOR_IGUAL, IGUAL_IGUAL, DIFERENTE, MAYOR, MENOR;
 terminal AND, OR, NOT;
 terminal IGUAL;
-
-/* literales / identificadores */
 terminal String ID, CADENA, ENTERO, DECIMAL;
-
-/* error token */
 terminal String ERROR;
 
 /* ====== NO TERMINALES ====== */
 non terminal program, stmts, stmt;
-non terminal read_block, fields_stmt, filter_stmt;
-non terminal field_list, id_list, value;
-non terminal expr;
+non terminal db_def, use_def, table_def, col_list, col_decl, type_def;
+non terminal read_stmt, field_decl, filter_decl, id_list, expr;
+non terminal export_stmt, add_stmt, pair_list, pair_assign;
+non terminal update_stmt, assign_list, assign_elem, clear_stmt;
+non terminal value;
 
 /* PRECEDENCIAS */
 precedence left OR;
@@ -100,61 +84,120 @@ start with program;
 
 %%
 
+/* ================= GRAMATICA ================= */
+
 program
   ::= stmts
   ;
 
 stmts
   ::= stmts stmt
-   |  /* vacío */
+   |  /* vacio */
   ;
 
-/* Instrucciones básicas: todas terminan en ; */
 stmt
-  ::= DATABASE ID PUNTO_COMA
-   |  USE ID PUNTO_COMA
-   |  TABLE ID PUNTO_COMA
-
-   | READ TABLE ID read_block PUNTO_COMA
-
-   |  EXPORT TABLE ID STORE AT CADENA PUNTO_COMA
-
-   |  ADD TABLE ID PUNTO_COMA
-   |  UPDATE TABLE ID SET ID IGUAL value PUNTO_COMA
-   |  CLEAR TABLE ID PUNTO_COMA
-
-   |  ERROR PUNTO_COMA
+  ::= db_def
+   |  use_def
+   |  table_def
+   |  read_stmt
+   |  export_stmt
+   |  add_stmt
+   |  update_stmt
+   |  clear_stmt
+   |  error PUNTO_COMA  {: emit("Error recuperado en punto y coma."); :}
+   |  error LLAVE_CIERRA {: emit("Error recuperado en llave de cierre."); :}
   ;
 
-read_block
-  ::= LLAVE_ABRE fields_stmt filter_stmt LLAVE_CIERRA
+/* 1. DATABASE: database <id> { store at "ruta"; } */
+db_def
+  ::= DATABASE ID LLAVE_ABRE STORE AT CADENA PUNTO_COMA LLAVE_CIERRA
   ;
 
-fields_stmt
-  ::= FIELDS DOS_PUNTOS field_list PUNTO_COMA
+/* 2. USE: use <id>; */
+use_def
+  ::= USE ID PUNTO_COMA
   ;
 
-filter_stmt
-  ::= FILTER DOS_PUNTOS expr PUNTO_COMA
+/* 3. TABLE: table <id> { col: tipo; ... } */
+table_def
+  ::= TABLE ID LLAVE_ABRE col_list LLAVE_CIERRA
   ;
 
-field_list
-  ::= ASTERISCO
-   |  id_list
+col_list
+  ::= col_list col_decl
+   |  col_decl
+  ;
+
+col_decl
+  ::= ID DOS_PUNTOS type_def PUNTO_COMA
+  ;
+
+type_def
+  ::= T_INT | T_STRING | T_FLOAT | T_BOOL
+  ;
+
+/* 4. READ: read <id> { fields: ...; filter: ...; }; */
+read_stmt
+  ::= READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA PUNTO_COMA
+   |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA PUNTO_COMA
+  ;
+
+field_decl
+  ::= FIELDS DOS_PUNTOS id_list PUNTO_COMA
+   |  FIELDS DOS_PUNTOS ASTERISCO PUNTO_COMA
   ;
 
 id_list
-  ::= ID
-   |  id_list COMA ID
+  ::= id_list COMA ID
+   |  ID
   ;
 
+filter_decl
+  ::= FILTER DOS_PUNTOS expr PUNTO_COMA
+  ;
+
+/* 5. EXPORT: export "archivo.json"; */
+export_stmt
+  ::= EXPORT CADENA PUNTO_COMA
+  ;
+
+/* 6. ADD: add <id> { campo: valor, ... }; */
+add_stmt
+  ::= ADD ID LLAVE_ABRE pair_list LLAVE_CIERRA PUNTO_COMA
+  ;
+
+pair_list
+  ::= pair_list COMA pair_assign
+   |  pair_assign
+  ;
+
+pair_assign
+  ::= ID DOS_PUNTOS value
+  ;
+
+/* 7. UPDATE: update <id> { set: ...; filter: ...; }; */
+update_stmt
+  ::= UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA filter_decl LLAVE_CIERRA PUNTO_COMA
+   |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA LLAVE_CIERRA PUNTO_COMA
+  ;
+
+assign_list
+  ::= assign_list COMA assign_elem
+   |  assign_elem
+  ;
+
+assign_elem
+  ::= ID IGUAL value
+  ;
+
+/* 8. CLEAR: clear <id>; */
+clear_stmt
+  ::= CLEAR ID PUNTO_COMA
+  ;
+
+/* Valores y Expresiones */
 value
-  ::= CADENA
-   |  ENTERO
-   |  DECIMAL
-   |  TRUE
-   |  FALSE
-   |  NULL
+  ::= CADENA | ENTERO | DECIMAL | TRUE | FALSE | NULL
   ;
 
 expr

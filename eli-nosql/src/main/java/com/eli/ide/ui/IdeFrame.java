@@ -275,16 +275,36 @@ public class IdeFrame extends JFrame {
                 int linea = s.left;
                 int columna = s.right;
 
-                // tabla TOKENS
-                tok.addRow(new Object[]{nTok++, lexema, tipoEnunciado(tokenName), linea, columna});
-
-                // tabla ERRORES
+                //Si es ERROR léxico → SOLO tabla ERRORES
                 if ("ERROR".equals(tokenName)) {
-                    err.addRow(new Object[]{nErr++, "Léxico", lexema, linea, columna});
+                    err.addRow(new Object[]{
+                            nErr++,
+                            "Léxico",
+                            lexema,
+                            linea,
+                            columna
+                    });
+                    continue;
                 }
+
+                //Si no es error → tabla TOKENS
+                tok.addRow(new Object[]{
+                        nTok++,
+                        lexema,
+                        tipoEnunciado(tokenName),
+                        linea,
+                        columna
+                });
             }
+
         } catch (Exception ex) {
-            err.addRow(new Object[]{nErr, "Léxico", ex.getMessage(), "-", "-"});
+            err.addRow(new Object[]{
+                    nErr++,
+                    "Léxico",
+                    ex.getMessage(),
+                    "-",
+                    "-"
+            });
         }
     }
 

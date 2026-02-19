@@ -11,6 +11,9 @@ import java_cup.runtime.Symbol;
 %line
 %column
 
+/* Estado especial para ignorar el contenido de los comentarios multilínea */
+%xstate MLCOMMENT
+
 %{
   private Symbol sym(int type) {
     return new Symbol(type, yyline + 1, yycolumn + 1, yytext());
@@ -22,20 +25,46 @@ import java_cup.runtime.Symbol;
 %}
 
 /* ===== Macros ===== */
-WS      = [ \t\r\n\f]+
-ID      = [a-zA-Z_][a-zA-Z0-9_]*
-INT     = [0-9]+
-DEC     = [0-9]+"."[0-9]+
-STRING = \"([^\"\\\r\n]|\\.)*\"
+WS       = [ \t\r\n\f]+
+ID       = [a-zA-Z_][a-zA-Z0-9_]*
+INT      = -?[0-9]+
+DEC      = -?[0-9]+"."[0-9]+
+STRING   = \"([^\"\\\r\n]|\\.)*\"
 
-/* comentarios de línea (// ...) */
-LINECMT = "//".*
+/* Comentario de línea: ## .... */
+LINECMT  = "##".*
 
 %%
 
 /* ===== Ignorar ===== */
 {WS}        { /* ignore */ }
 {LINECMT}   { /* ignore */ }
+
+/* ===== Comentario multilínea: #* .... #* ===== */
+<YYINITIAL> "#*" {
+    System.out.println("DEBUG: Inicio de comentario multilinea");
+    yybegin(MLCOMMENT);
+}
+
+<MLCOMMENT> {
+    /* Si encuentra el cierre, vuelve a procesar tokens normales */
+    "#*" {
+        System.out.println("DEBUG: Fin de comentario multilinea");
+        yybegin(YYINITIAL);
+    }
+
+    /* Importante: capturar saltos de línea para que el comentario sea realmente multilínea */
+    \n | \r | \r\n { /* ignore */ }
+
+    /* Ignorar cualquier otro carácter */
+    . { /* ignore */ }
+
+    /* Error si se llega al final del archivo y el comentario no se cerró */
+    <<EOF>> {
+        System.err.println("Error: Comentario sin cerrar");
+        return sym(sym.ERROR, "Error: Comentario multilínea sin cerrar al final del archivo");
+    }
+}
 
 /* ===== Palabras reservadas ===== */
 "database"   { return sym(sym.DATABASE); }
@@ -52,11 +81,13 @@ LINECMT = "//".*
 "set"        { return sym(sym.SET); }
 "clear"      { return sym(sym.CLEAR); }
 
-/* tipos */
+/* ===== Tipos ===== */
 "int"        { return sym(sym.T_INT); }
 "string"     { return sym(sym.T_STRING); }
+"float"      { return sym(sym.T_FLOAT); }
+"bool"       { return sym(sym.T_BOOL); }
 
-/* booleanos */
+/* ===== Literales boolean/null ===== */
 "true"       { return sym(sym.TRUE); }
 "false"      { return sym(sym.FALSE); }
 "null"       { return sym(sym.NULL); }
@@ -75,7 +106,6 @@ LINECMT = "//".*
 "*"          { return sym(sym.ASTERISCO); }
 
 /* ===== Operadores ===== */
-/* Relacionales (poner primero los de 2 chars) */
 ">="         { return sym(sym.MAYOR_IGUAL); }
 "<="         { return sym(sym.MENOR_IGUAL); }
 "=="         { return sym(sym.IGUAL_IGUAL); }
@@ -83,12 +113,10 @@ LINECMT = "//".*
 ">"          { return sym(sym.MAYOR); }
 "<"          { return sym(sym.MENOR); }
 
-/* Lógicos */
 "&&"         { return sym(sym.AND); }
 "||"         { return sym(sym.OR); }
 "!"          { return sym(sym.NOT); }
 
-/* Asignación */
 "="          { return sym(sym.IGUAL); }
 
 /* ===== Literales ===== */
