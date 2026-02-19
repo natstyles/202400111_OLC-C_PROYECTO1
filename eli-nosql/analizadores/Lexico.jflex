@@ -11,7 +11,7 @@ import java_cup.runtime.Symbol;
 %line
 %column
 
-/* Estado especial para ignorar el contenido de los comentarios multilínea */
+/* Estado exclusivo para comentarios multilínea */
 %xstate MLCOMMENT
 
 %{
@@ -42,28 +42,25 @@ LINECMT  = "##".*
 
 /* ===== Comentario multilínea: #* .... #* ===== */
 <YYINITIAL> "#*" {
-    System.out.println("DEBUG: Inicio de comentario multilinea");
+    // System.out.println("DEBUG: Inicio de comentario multilinea");
     yybegin(MLCOMMENT);
 }
 
 <MLCOMMENT> {
-    /* Si encuentra el cierre, vuelve a procesar tokens normales */
+    /* Cierre del comentario */
     "#*" {
-        System.out.println("DEBUG: Fin de comentario multilinea");
+        // System.out.println("DEBUG: Fin de comentario multilinea");
         yybegin(YYINITIAL);
     }
 
-    /* Importante: capturar saltos de línea para que el comentario sea realmente multilínea */
-    \n | \r | \r\n { /* ignore */ }
-
-    /* Ignorar cualquier otro carácter */
-    . { /* ignore */ }
-
-    /* Error si se llega al final del archivo y el comentario no se cerró */
+    /* Si llega EOF sin cerrar, reporta 1 error y luego permite terminar en EOF normal */
     <<EOF>> {
-        System.err.println("Error: Comentario sin cerrar");
-        return sym(sym.ERROR, "Error: Comentario multilínea sin cerrar al final del archivo");
+        yybegin(YYINITIAL);
+        return sym(sym.ERROR, "Comentario multilínea sin cerrar al final del archivo");
     }
+
+    /* Consumir absolutamente cualquier carácter (incluye \n, \r, etc.) */
+    [^] { /* ignore */ }
 }
 
 /* ===== Palabras reservadas ===== */
