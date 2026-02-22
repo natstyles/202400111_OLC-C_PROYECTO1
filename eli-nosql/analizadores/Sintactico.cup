@@ -7,9 +7,12 @@ parser code {:
     private java.util.function.Consumer<String> log = null;
     private java.util.function.Consumer<String[]> errSink = null;
 
-    // Indica si se detectó algún error durante el parseo
+    // BANDERA: Indica si se detectó algún error durante el parseo
     public boolean hayErrores = false;
 
+    // -------------------------------------------------------------------------
+    // CONSTRUCTOR PERSONALIZADO (3 Argumentos)
+    // -------------------------------------------------------------------------
     public Sintactico(java_cup.runtime.Scanner s,
                       java.util.function.Consumer<String> log,
                       java.util.function.Consumer<String[]> errSink) {
@@ -18,57 +21,50 @@ parser code {:
         this.errSink = errSink;
     }
 
-    //enviar mensajes a la consola del IDE
     private void emit(String msg) {
         if (log != null) log.accept(msg);
         else System.out.println(msg);
     }
 
-    //enviar errores a la tabla
     private void pushErr(String tipo, String desc, Symbol sym) {
         if (errSink != null && sym != null) {
             errSink.accept(new String[]{ tipo, desc, String.valueOf(sym.left), String.valueOf(sym.right) });
         }
     }
 
-    // Se ejecuta cuando CUP detecta un error pero intenta recuperarse
+    // NUEVO MÉTODO: Inyecta errores a la tabla sin romper el parser
+    public void reportar_error_manual(String mensaje, int linea, int columna) {
+        this.hayErrores = true;
+        emit("Error Sintáctico: " + mensaje + " [Linea: " + linea + ", Columna: " + columna + "]");
+        if (errSink != null) {
+            errSink.accept(new String[]{ "Sintáctico", mensaje, String.valueOf(linea), String.valueOf(columna) });
+        }
+    }
+
+    // Se ejecuta cuando CUP detecta un error nativo
     @Override
     public void syntax_error(Symbol s) {
-        this.hayErrores = true; //Levantamos la bandera de error
-
-        String lexema = "";
-        if (s.value != null) {
-            lexema = s.value.toString();
-        } else {
-            //Intenta obtener el nombre del token si no tiene un valor en texto
-            try { lexema = sym.terminalNames[s.sym]; }
-            catch (Exception e) { lexema = "Token desconocido"; }
-        }
-
-        String mensaje;
-        if (s.sym == sym.EOF) {
-            mensaje = "Se alcanzó el final del archivo inesperadamente. Verifica que no falte cerrar una llave '}' o un punto y coma ';'.";
-        } else {
-            mensaje = "Sintaxis incorrecta cerca de '" + lexema + "'. Es posible que falte un punto y coma ';', una llave, o la estructura sea inválida.";
-        }
+        this.hayErrores = true;
+        String lexema = (s.value != null) ? s.value.toString() : "Token desconocido";
+        String mensaje = (s.sym == sym.EOF)
+            ? "Se alcanzó el final del archivo inesperadamente. Verifica que no falte cerrar una llave '}' o un punto y coma ';'."
+            : "Sintaxis incorrecta cerca de '" + lexema + "'.";
 
         emit("Error Sintáctico: " + mensaje + " [Linea: " + s.left + ", Columna: " + s.right + "]");
         pushErr("Sintáctico", mensaje, s);
     }
 
-    //cuando CUP ya no puede recuperarse del error
     @Override
     public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception {
         this.hayErrores = true;
         String lexema = (s.value != null) ? s.value.toString() : "elemento";
-        String mensaje = "Error Fatal irrecuperable cerca de '" + lexema + "'. No se pudo continuar el análisis.";
-
+        String mensaje = "Error Fatal irrecuperable cerca de '" + lexema + "'.";
         emit("Error Fatal: " + mensaje + " [Linea: " + s.left + ", Columna: " + s.right + "]");
         pushErr("Sintáctico", mensaje, s);
     }
 :};
 
-/* Terminales */
+/* ====== TERMINALES ====== */
 terminal DATABASE, USE, TABLE, READ, FIELDS, FILTER, STORE, AT, EXPORT, ADD, UPDATE, SET, CLEAR;
 terminal T_INT, T_STRING, T_FLOAT, T_BOOL, T_ARRAY, T_OBJECT, TRUE, FALSE, NULL;
 terminal LLAVE_ABRE, LLAVE_CIERRA, PAR_ABRE, PAR_CIERRA, COR_ABRE, COR_CIERRA;
@@ -79,7 +75,7 @@ terminal IGUAL;
 terminal String ID, CADENA, ENTERO, DECIMAL;
 terminal String ERROR;
 
-/* no terminales */
+/* ====== NO TERMINALES ====== */
 non terminal program, stmts, stmt;
 non terminal db_def, store_opt, use_def, table_def, col_list, col_decl, type_def;
 non terminal read_stmt, field_decl, filter_decl, id_list, expr;
@@ -87,7 +83,7 @@ non terminal export_stmt, add_stmt, pair_list, pair_assign;
 non terminal update_stmt, assign_list, assign_elem, clear_stmt;
 non terminal value, array_def, val_list;
 
-/* precedencia */
+/* ====== PRECEDENCIAS ====== */
 precedence left OR;
 precedence left AND;
 precedence left IGUAL_IGUAL, DIFERENTE, MAYOR, MENOR, MAYOR_IGUAL, MENOR_IGUAL;
@@ -97,7 +93,7 @@ start with program;
 
 %%
 
-/* gramáticas */
+/* ================= GRAMATICA ================= */
 
 program
   ::= stmts
@@ -105,7 +101,7 @@ program
 
 stmts
   ::= stmts stmt
-   |  /* empty */
+   |  /* vacio */
   ;
 
 stmt
@@ -117,13 +113,14 @@ stmt
    |  add_stmt
    |  update_stmt
    |  clear_stmt
-   |  error PUNTO_COMA  {: emit("Error recuperado en punto y coma."); :}
-   |  error LLAVE_CIERRA {: emit("Error recuperado en llave de cierre."); :}
+   |  error PUNTO_COMA
+   |  error LLAVE_CIERRA
   ;
 
-/* DATABASE: database <id> { store at "ruta"; (Opcional) } */
+/* 1. DATABASE (No lleva ';' al final de la llave) */
 db_def
   ::= DATABASE ID LLAVE_ABRE store_opt LLAVE_CIERRA
+   |  DATABASE ID LLAVE_ABRE error LLAVE_CIERRA
   ;
 
 store_opt
@@ -131,14 +128,16 @@ store_opt
    |  /* vacio */
   ;
 
-/* USE: use <id>; */
+/* 2. USE */
 use_def
   ::= USE ID PUNTO_COMA
+   |  USE error PUNTO_COMA
   ;
 
-/* TABLE: table <id> { col: tipo; ... } */
+/* 3. TABLE (No lleva ';' al final de la llave) */
 table_def
   ::= TABLE ID LLAVE_ABRE col_list LLAVE_CIERRA
+   |  TABLE ID LLAVE_ABRE error LLAVE_CIERRA
   ;
 
 col_list
@@ -151,20 +150,31 @@ col_decl
   ;
 
 type_def
-  ::= T_INT | T_STRING | T_FLOAT | T_BOOL
+  ::= T_INT | T_STRING | T_FLOAT | T_BOOL | T_ARRAY | T_OBJECT
   ;
 
-/* READ: read <id> { fields: ...; filter: ...; }; */
+/* 4. READ (SÍ lleva ';' al final de la llave) */
 read_stmt
   ::= READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA PUNTO_COMA
    |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA PUNTO_COMA
+
+   /* Faltó ';' al final del bloque */
+   |  READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA:c
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); :}
+   |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA:c
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); :}
+
+   /* Modo Pánico: Error interno, y SI tiene el ';' final */
+   |  READ ID LLAVE_ABRE error LLAVE_CIERRA PUNTO_COMA
+
+   /* Modo Pánico: Error interno, Y TAMBIEN le falta el ';' final */
+   |  READ ID LLAVE_ABRE error LLAVE_CIERRA:c
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); :}
   ;
 
 field_decl
   ::= FIELDS DOS_PUNTOS id_list PUNTO_COMA
-   |  FIELDS DOS_PUNTOS id_list COMA
    |  FIELDS DOS_PUNTOS ASTERISCO PUNTO_COMA
-   |  FIELDS DOS_PUNTOS ASTERISCO COMA
   ;
 
 id_list
@@ -174,18 +184,26 @@ id_list
 
 filter_decl
   ::= FILTER DOS_PUNTOS expr PUNTO_COMA
-   |  FILTER DOS_PUNTOS expr COMA
-   |  FILTER DOS_PUNTOS expr
   ;
 
-/* EXPORT: export "archivo.json"; */
+/* 5. EXPORT */
 export_stmt
   ::= EXPORT CADENA PUNTO_COMA
+   |  EXPORT error PUNTO_COMA
   ;
 
-/* ADD: add <id> { campo: valor, ... }; */
+/* 6. ADD (SÍ lleva ';' al final de la llave) */
 add_stmt
   ::= ADD ID LLAVE_ABRE pair_list LLAVE_CIERRA PUNTO_COMA
+
+   /* Faltó ';' al final del bloque */
+   |  ADD ID LLAVE_ABRE pair_list LLAVE_CIERRA:c
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'add'", cleft, cright); :}
+
+   /* Modo Pánico interno */
+   |  ADD ID LLAVE_ABRE error LLAVE_CIERRA PUNTO_COMA
+   |  ADD ID LLAVE_ABRE error LLAVE_CIERRA:c
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'add'", cleft, cright); :}
   ;
 
 pair_list
@@ -197,10 +215,21 @@ pair_assign
   ::= ID DOS_PUNTOS value
   ;
 
-/* UPDATE */
+/* 7. UPDATE (SÍ lleva ';' al final de la llave) */
 update_stmt
   ::= UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA filter_decl LLAVE_CIERRA PUNTO_COMA
    |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA LLAVE_CIERRA PUNTO_COMA
+
+   /* Faltó ';' al final del bloque */
+   |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA filter_decl LLAVE_CIERRA:c
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); :}
+   |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA LLAVE_CIERRA:c
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); :}
+
+   /* Modo Pánico interno */
+   |  UPDATE ID LLAVE_ABRE error LLAVE_CIERRA PUNTO_COMA
+   |  UPDATE ID LLAVE_ABRE error LLAVE_CIERRA:c
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); :}
   ;
 
 assign_list
@@ -212,12 +241,13 @@ assign_elem
   ::= ID IGUAL value
   ;
 
-/* CLEAR: clear <id>; */
+/* 8. CLEAR */
 clear_stmt
   ::= CLEAR ID PUNTO_COMA
+   |  CLEAR error PUNTO_COMA
   ;
 
-/* Valores, Expresiones y Arreglos */
+/* Valores y Arreglos */
 value
   ::= CADENA
    |  ENTERO
@@ -238,6 +268,7 @@ val_list
    |  value
   ;
 
+/* Expresiones */
 expr
   ::= expr OR expr
    |  expr AND expr
