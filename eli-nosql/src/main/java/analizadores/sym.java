@@ -10,50 +10,52 @@ public class sym {
   /* terminals */
   public static final int T_FLOAT = 17;
   public static final int STORE = 8;
-  public static final int ENTERO = 44;
-  public static final int DIFERENTE = 35;
-  public static final int DOS_PUNTOS = 28;
+  public static final int ENTERO = 46;
+  public static final int T_OBJECT = 20;
+  public static final int DIFERENTE = 37;
+  public static final int DOS_PUNTOS = 30;
   public static final int FILTER = 7;
-  public static final int COR_CIERRA = 27;
+  public static final int COR_CIERRA = 29;
   public static final int T_INT = 15;
   public static final int UPDATE = 12;
-  public static final int ASTERISCO = 31;
-  public static final int PAR_ABRE = 24;
-  public static final int NOT = 40;
-  public static final int AND = 38;
-  public static final int IGUAL = 41;
-  public static final int COR_ABRE = 26;
+  public static final int ASTERISCO = 33;
+  public static final int PAR_ABRE = 26;
+  public static final int NOT = 42;
+  public static final int AND = 40;
+  public static final int IGUAL = 43;
+  public static final int COR_ABRE = 28;
   public static final int USE = 3;
-  public static final int OR = 39;
-  public static final int ID = 42;
-  public static final int PUNTO_COMA = 29;
-  public static final int IGUAL_IGUAL = 34;
-  public static final int DECIMAL = 45;
+  public static final int OR = 41;
+  public static final int ID = 44;
+  public static final int IGUAL_IGUAL = 36;
+  public static final int PUNTO_COMA = 31;
+  public static final int T_ARRAY = 19;
+  public static final int DECIMAL = 47;
   public static final int EOF = 0;
   public static final int TABLE = 4;
-  public static final int TRUE = 19;
+  public static final int TRUE = 21;
   public static final int error = 1;
-  public static final int COMA = 30;
-  public static final int CADENA = 43;
+  public static final int COMA = 32;
+  public static final int CADENA = 45;
   public static final int EXPORT = 10;
   public static final int ADD = 11;
-  public static final int MENOR = 37;
-  public static final int NULL = 21;
+  public static final int MENOR = 39;
+  public static final int NULL = 23;
   public static final int FIELDS = 6;
-  public static final int LLAVE_ABRE = 22;
-  public static final int ERROR = 46;
-  public static final int MAYOR = 36;
+  public static final int LLAVE_ABRE = 24;
+  public static final int ERROR = 48;
+  public static final int MAYOR = 38;
   public static final int T_STRING = 16;
   public static final int T_BOOL = 18;
   public static final int READ = 5;
-  public static final int MAYOR_IGUAL = 32;
+  public static final int MAYOR_IGUAL = 34;
   public static final int CLEAR = 14;
   public static final int DATABASE = 2;
-  public static final int LLAVE_CIERRA = 23;
+  public static final int LLAVE_CIERRA = 25;
+  public static final int MENOR_IGUAL = 35;
   public static final int AT = 9;
-  public static final int MENOR_IGUAL = 33;
-  public static final int FALSE = 20;
-  public static final int PAR_CIERRA = 25;
+  public static final int FALSE = 22;
+  public static final int PAR_CIERRA = 27;
   public static final int SET = 13;
   public static final String[] terminalNames = new String[] {
   "EOF",
@@ -75,6 +77,8 @@ public class sym {
   "T_STRING",
   "T_FLOAT",
   "T_BOOL",
+  "T_ARRAY",
+  "T_OBJECT",
   "TRUE",
   "FALSE",
   "NULL",

@@ -9,13 +9,11 @@ parser code {:
 
     // -------------------------------------------------------------------------
     // CONSTRUCTOR PERSONALIZADO (3 Argumentos)
-    // Este es el que busca IdeFrame.java.
-    // Al tener 3 parametros, NO choca con el constructor por defecto de CUP.
     // -------------------------------------------------------------------------
     public Sintactico(java_cup.runtime.Scanner s,
                       java.util.function.Consumer<String> log,
                       java.util.function.Consumer<String[]> errSink) {
-        super(s); // Llamamos al constructor padre
+        super(s);
         this.log = log;
         this.errSink = errSink;
     }
@@ -57,7 +55,7 @@ parser code {:
 
 /* ====== TERMINALES ====== */
 terminal DATABASE, USE, TABLE, READ, FIELDS, FILTER, STORE, AT, EXPORT, ADD, UPDATE, SET, CLEAR;
-terminal T_INT, T_STRING, T_FLOAT, T_BOOL, TRUE, FALSE, NULL;
+terminal T_INT, T_STRING, T_FLOAT, T_BOOL, T_ARRAY, T_OBJECT, TRUE, FALSE, NULL;
 terminal LLAVE_ABRE, LLAVE_CIERRA, PAR_ABRE, PAR_CIERRA, COR_ABRE, COR_CIERRA;
 terminal DOS_PUNTOS, PUNTO_COMA, COMA, ASTERISCO;
 terminal MAYOR_IGUAL, MENOR_IGUAL, IGUAL_IGUAL, DIFERENTE, MAYOR, MENOR;
@@ -68,17 +66,18 @@ terminal String ERROR;
 
 /* ====== NO TERMINALES ====== */
 non terminal program, stmts, stmt;
-non terminal db_def, use_def, table_def, col_list, col_decl, type_def;
+non terminal db_def, store_opt, use_def, table_def, col_list, col_decl, type_def;
 non terminal read_stmt, field_decl, filter_decl, id_list, expr;
 non terminal export_stmt, add_stmt, pair_list, pair_assign;
 non terminal update_stmt, assign_list, assign_elem, clear_stmt;
-non terminal value;
+non terminal value, array_def, val_list;
+non terminal sep, sep_opt;
 
-/* PRECEDENCIAS */
+/* ====== PRECEDENCIAS (De menor a mayor) ====== */
 precedence left OR;
 precedence left AND;
-precedence right NOT;
 precedence left IGUAL_IGUAL, DIFERENTE, MAYOR, MENOR, MAYOR_IGUAL, MENOR_IGUAL;
+precedence right NOT;
 
 start with program;
 
@@ -108,9 +107,14 @@ stmt
    |  error LLAVE_CIERRA {: emit("Error recuperado en llave de cierre."); :}
   ;
 
-/* 1. DATABASE: database <id> { store at "ruta"; } */
+/* 1. DATABASE: database <id> { store at "ruta"; (Opcional) } */
 db_def
-  ::= DATABASE ID LLAVE_ABRE STORE AT CADENA PUNTO_COMA LLAVE_CIERRA
+  ::= DATABASE ID LLAVE_ABRE store_opt LLAVE_CIERRA
+  ;
+
+store_opt
+  ::= STORE AT CADENA PUNTO_COMA
+   |  /* vacio */
   ;
 
 /* 2. USE: use <id>; */
@@ -138,13 +142,15 @@ type_def
 
 /* 4. READ: read <id> { fields: ...; filter: ...; }; */
 read_stmt
-  ::= READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA PUNTO_COMA
-   |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA PUNTO_COMA
+  ::= READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA
+   |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA
   ;
 
 field_decl
   ::= FIELDS DOS_PUNTOS id_list PUNTO_COMA
+   |  FIELDS DOS_PUNTOS id_list COMA
    |  FIELDS DOS_PUNTOS ASTERISCO PUNTO_COMA
+   |  FIELDS DOS_PUNTOS ASTERISCO COMA
   ;
 
 id_list
@@ -154,6 +160,17 @@ id_list
 
 filter_decl
   ::= FILTER DOS_PUNTOS expr PUNTO_COMA
+   |  FILTER DOS_PUNTOS expr COMA
+   |  FILTER DOS_PUNTOS expr
+  ;
+
+/* Separadores flexibles para soportar los ejemplos del manual */
+sep
+  ::= PUNTO_COMA | COMA
+  ;
+
+sep_opt
+  ::= PUNTO_COMA | COMA | /* vacio */
   ;
 
 /* 5. EXPORT: export "archivo.json"; */
@@ -177,8 +194,8 @@ pair_assign
 
 /* 7. UPDATE: update <id> { set: ...; filter: ...; }; */
 update_stmt
-  ::= UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA filter_decl LLAVE_CIERRA PUNTO_COMA
-   |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA LLAVE_CIERRA PUNTO_COMA
+  ::= UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list sep filter_decl LLAVE_CIERRA PUNTO_COMA
+   |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list sep_opt LLAVE_CIERRA PUNTO_COMA
   ;
 
 assign_list
@@ -195,9 +212,25 @@ clear_stmt
   ::= CLEAR ID PUNTO_COMA
   ;
 
-/* Valores y Expresiones */
+/* Valores, Expresiones y Arreglos */
 value
-  ::= CADENA | ENTERO | DECIMAL | TRUE | FALSE | NULL
+  ::= CADENA
+   |  ENTERO
+   |  DECIMAL
+   |  TRUE
+   |  FALSE
+   |  NULL
+   |  array_def
+  ;
+
+array_def
+  ::= COR_ABRE val_list COR_CIERRA
+   |  COR_ABRE COR_CIERRA
+  ;
+
+val_list
+  ::= val_list COMA value
+   |  value
   ;
 
 expr
