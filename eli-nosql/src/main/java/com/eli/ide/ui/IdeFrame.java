@@ -431,7 +431,7 @@ public class IdeFrame extends JFrame {
         final int[] nErr = { errModel.getRowCount() + 1 };
 
         try {
-            analizadores.Lexico lex2 = new analizadores.Lexico(new StringReader(input));
+            analizadores.Lexico lex2 = new analizadores.Lexico(new java.io.StringReader(input));
 
             analizadores.Sintactico parser = new analizadores.Sintactico(
                     lex2,
@@ -439,18 +439,26 @@ public class IdeFrame extends JFrame {
                     row -> {
                         errModel.addRow(new Object[]{
                                 nErr[0]++,
-                                row[0],
-                                row[1],
-                                row[2],
-                                row[3]
+                                row[0],     // Tipo
+                                row[1],     // Descripción
+                                row[2],     // Línea
+                                row[3]      // Columna
                         });
                     }
             );
 
+            // Ejecutamos el parser
             parser.parse();
-            console.append(">> Análisis completado: SIN errores.\n");
+
+            // Comprobamos la bandera de errores que configuramos en CUP
+            if (parser.hayErrores) {
+                console.append(">> Análisis finalizado. Se encontraron ERRORES SINTÁCTICOS. Revisa la tabla de errores.\n");
+            } else {
+                console.append(">> Análisis completado: SIN errores.\n");
+            }
+
         } catch (Exception ex) {
-            console.append(">> Error en análisis: " + ex.getMessage() + "\n");
+            console.append(">> Error fatal en el análisis: No se pudo continuar compilando.\n");
         }
     }
 

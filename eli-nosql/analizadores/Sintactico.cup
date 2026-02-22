@@ -7,9 +7,9 @@ parser code {:
     private java.util.function.Consumer<String> log = null;
     private java.util.function.Consumer<String[]> errSink = null;
 
-    // -------------------------------------------------------------------------
-    // CONSTRUCTOR PERSONALIZADO (3 Argumentos)
-    // -------------------------------------------------------------------------
+    // Indica si se detectó algún error durante el parseo
+    public boolean hayErrores = false;
+
     public Sintactico(java_cup.runtime.Scanner s,
                       java.util.function.Consumer<String> log,
                       java.util.function.Consumer<String[]> errSink) {
@@ -18,42 +18,57 @@ parser code {:
         this.errSink = errSink;
     }
 
-    // Metodo auxiliar para enviar mensajes a la consola del IDE
+    //enviar mensajes a la consola del IDE
     private void emit(String msg) {
         if (log != null) log.accept(msg);
         else System.out.println(msg);
     }
 
-    // Metodo auxiliar para enviar errores a la tabla de errores del IDE
-    private void pushErr(String tipo, String desc, Object info) {
-        if (errSink == null) return;
-        if (info instanceof java_cup.runtime.Symbol) {
-            java_cup.runtime.Symbol sym = (java_cup.runtime.Symbol) info;
-            errSink.accept(new String[]{ tipo, desc, ""+sym.left, ""+sym.right });
-        } else {
-            errSink.accept(new String[]{tipo, desc, "-", "-"});
+    //enviar errores a la tabla
+    private void pushErr(String tipo, String desc, Symbol sym) {
+        if (errSink != null && sym != null) {
+            errSink.accept(new String[]{ tipo, desc, String.valueOf(sym.left), String.valueOf(sym.right) });
         }
     }
 
-    // Metodo oficial de CUP para reportar errores
-    public void report_error(String message, Object info) {
-        if (info instanceof java_cup.runtime.Symbol) {
-            java_cup.runtime.Symbol s = (java_cup.runtime.Symbol) info;
-            emit("Error Sintactico: " + message + " [Linea: " + s.left + ", Columna: " + s.right + "]");
-            pushErr("Sintactico", message, info);
+    // Se ejecuta cuando CUP detecta un error pero intenta recuperarse
+    @Override
+    public void syntax_error(Symbol s) {
+        this.hayErrores = true; //Levantamos la bandera de error
+
+        String lexema = "";
+        if (s.value != null) {
+            lexema = s.value.toString();
         } else {
-            emit("Error Sintactico: " + message);
-            pushErr("Sintactico", message, info);
+            //Intenta obtener el nombre del token si no tiene un valor en texto
+            try { lexema = sym.terminalNames[s.sym]; }
+            catch (Exception e) { lexema = "Token desconocido"; }
         }
+
+        String mensaje;
+        if (s.sym == sym.EOF) {
+            mensaje = "Se alcanzó el final del archivo inesperadamente. Verifica que no falte cerrar una llave '}' o un punto y coma ';'.";
+        } else {
+            mensaje = "Sintaxis incorrecta cerca de '" + lexema + "'. Es posible que falte un punto y coma ';', una llave, o la estructura sea inválida.";
+        }
+
+        emit("Error Sintáctico: " + mensaje + " [Linea: " + s.left + ", Columna: " + s.right + "]");
+        pushErr("Sintáctico", mensaje, s);
     }
 
-    // Metodo para errores fatales
-    public void report_fatal_error(String message, Object info) {
-        report_error("Error Fatal: " + message, info);
+    //cuando CUP ya no puede recuperarse del error
+    @Override
+    public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception {
+        this.hayErrores = true;
+        String lexema = (s.value != null) ? s.value.toString() : "elemento";
+        String mensaje = "Error Fatal irrecuperable cerca de '" + lexema + "'. No se pudo continuar el análisis.";
+
+        emit("Error Fatal: " + mensaje + " [Linea: " + s.left + ", Columna: " + s.right + "]");
+        pushErr("Sintáctico", mensaje, s);
     }
 :};
 
-/* ====== TERMINALES ====== */
+/* Terminales */
 terminal DATABASE, USE, TABLE, READ, FIELDS, FILTER, STORE, AT, EXPORT, ADD, UPDATE, SET, CLEAR;
 terminal T_INT, T_STRING, T_FLOAT, T_BOOL, T_ARRAY, T_OBJECT, TRUE, FALSE, NULL;
 terminal LLAVE_ABRE, LLAVE_CIERRA, PAR_ABRE, PAR_CIERRA, COR_ABRE, COR_CIERRA;
@@ -64,16 +79,15 @@ terminal IGUAL;
 terminal String ID, CADENA, ENTERO, DECIMAL;
 terminal String ERROR;
 
-/* ====== NO TERMINALES ====== */
+/* no terminales */
 non terminal program, stmts, stmt;
 non terminal db_def, store_opt, use_def, table_def, col_list, col_decl, type_def;
 non terminal read_stmt, field_decl, filter_decl, id_list, expr;
 non terminal export_stmt, add_stmt, pair_list, pair_assign;
 non terminal update_stmt, assign_list, assign_elem, clear_stmt;
 non terminal value, array_def, val_list;
-non terminal sep, sep_opt;
 
-/* ====== PRECEDENCIAS (De menor a mayor) ====== */
+/* precedencia */
 precedence left OR;
 precedence left AND;
 precedence left IGUAL_IGUAL, DIFERENTE, MAYOR, MENOR, MAYOR_IGUAL, MENOR_IGUAL;
@@ -83,7 +97,7 @@ start with program;
 
 %%
 
-/* ================= GRAMATICA ================= */
+/* gramáticas */
 
 program
   ::= stmts
@@ -91,7 +105,7 @@ program
 
 stmts
   ::= stmts stmt
-   |  /* vacio */
+   |  /* empty */
   ;
 
 stmt
@@ -107,7 +121,7 @@ stmt
    |  error LLAVE_CIERRA {: emit("Error recuperado en llave de cierre."); :}
   ;
 
-/* 1. DATABASE: database <id> { store at "ruta"; (Opcional) } */
+/* DATABASE: database <id> { store at "ruta"; (Opcional) } */
 db_def
   ::= DATABASE ID LLAVE_ABRE store_opt LLAVE_CIERRA
   ;
@@ -117,12 +131,12 @@ store_opt
    |  /* vacio */
   ;
 
-/* 2. USE: use <id>; */
+/* USE: use <id>; */
 use_def
   ::= USE ID PUNTO_COMA
   ;
 
-/* 3. TABLE: table <id> { col: tipo; ... } */
+/* TABLE: table <id> { col: tipo; ... } */
 table_def
   ::= TABLE ID LLAVE_ABRE col_list LLAVE_CIERRA
   ;
@@ -140,10 +154,10 @@ type_def
   ::= T_INT | T_STRING | T_FLOAT | T_BOOL
   ;
 
-/* 4. READ: read <id> { fields: ...; filter: ...; }; */
+/* READ: read <id> { fields: ...; filter: ...; }; */
 read_stmt
-  ::= READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA
-   |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA
+  ::= READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA PUNTO_COMA
+   |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA PUNTO_COMA
   ;
 
 field_decl
@@ -164,21 +178,12 @@ filter_decl
    |  FILTER DOS_PUNTOS expr
   ;
 
-/* Separadores flexibles para soportar los ejemplos del manual */
-sep
-  ::= PUNTO_COMA | COMA
-  ;
-
-sep_opt
-  ::= PUNTO_COMA | COMA | /* vacio */
-  ;
-
-/* 5. EXPORT: export "archivo.json"; */
+/* EXPORT: export "archivo.json"; */
 export_stmt
   ::= EXPORT CADENA PUNTO_COMA
   ;
 
-/* 6. ADD: add <id> { campo: valor, ... }; */
+/* ADD: add <id> { campo: valor, ... }; */
 add_stmt
   ::= ADD ID LLAVE_ABRE pair_list LLAVE_CIERRA PUNTO_COMA
   ;
@@ -192,10 +197,10 @@ pair_assign
   ::= ID DOS_PUNTOS value
   ;
 
-/* 7. UPDATE: update <id> { set: ...; filter: ...; }; */
+/* UPDATE */
 update_stmt
-  ::= UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list sep filter_decl LLAVE_CIERRA PUNTO_COMA
-   |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list sep_opt LLAVE_CIERRA PUNTO_COMA
+  ::= UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA filter_decl LLAVE_CIERRA PUNTO_COMA
+   |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA LLAVE_CIERRA PUNTO_COMA
   ;
 
 assign_list
@@ -207,7 +212,7 @@ assign_elem
   ::= ID IGUAL value
   ;
 
-/* 8. CLEAR: clear <id>; */
+/* CLEAR: clear <id>; */
 clear_stmt
   ::= CLEAR ID PUNTO_COMA
   ;
