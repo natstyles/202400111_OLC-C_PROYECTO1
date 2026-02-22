@@ -3,32 +3,47 @@ package com.eli.ide.ui;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
-import java.awt.*;
-import java.io.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
 
+import java.awt.*;
 import java.awt.Desktop;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 import java_cup.runtime.Symbol;
 import analizadores.sym;
 
 public class IdeFrame extends JFrame {
 
-    private final JTextArea editor = new JTextArea();
+    /* ====== Multi-tab editor ====== */
+    private final JTabbedPane editorTabs = new JTabbedPane();
+    private final Map<Component, EditorTab> tabByComponent = new HashMap<>();
+    private int untitledCounter = 1;
+
+    /* ====== Consola / Output (globales) ====== */
     private final JTextArea console = new JTextArea();
     private final JTable tokensTable;
     private final JTable errorsTable;
-    private File currentFile = null;
-    private boolean dirty = false; //hay cambios sin guardar
-    private boolean suppressDirty = false;
-    private DocumentListener dirtyListener;
-    private Document attachedDocument; //saber a cuál documento está pegado el listener
+
+    private static class EditorTab {
+        final JTextArea area = new JTextArea();
+        File file = null;
+        boolean dirty = false;
+
+        DocumentListener listener;
+        Document attachedDocument;
+
+        String displayName() {
+            return (file == null) ? "Nuevo " : file.getName();
+        }
+    }
 
     public IdeFrame() {
         super("ELI-NOSQL");
@@ -36,7 +51,7 @@ public class IdeFrame extends JFrame {
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
-                if (confirmDiscardIfNeeded()) dispose();
+                if (confirmCloseAllTabs()) dispose();
             }
         });
 
@@ -45,33 +60,30 @@ public class IdeFrame extends JFrame {
 
         setJMenuBar(buildMenuBar());
 
-        //Panel de editor
-        editor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
-        JScrollPane editorScroll = new JScrollPane(editor);
-        editorScroll.setBorder(new TitledBorder("Editor"));
-        installDirtyTracking();
-        updateTitle();
+        // ===== Editor Tabs =====
+        editorTabs.setBorder(new TitledBorder("Editor"));
+        editorTabs.addChangeListener(e -> updateTitle());
 
-        //Consola
-        console.setEditable(false); //No puedan escribir
+        // crea primera pestaña en blanco
+        addNewTab(null, "");
+
+        // ===== Consola =====
+        console.setEditable(false);
         console.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         JScrollPane consoleScroll = new JScrollPane(console);
         consoleScroll.setBorder(new TitledBorder("Consola"));
 
-        //Salida (Tokens)
-        //TOKENS
+        // ===== Output (Tokens/Errores) =====
         tokensTable = new JTable(new DefaultTableModel(
                 new Object[]{"#", "Lexema", "Tipo", "Línea", "Columna"}, 0
         ));
         JScrollPane tokensScroll = new JScrollPane(tokensTable);
 
-        //ERROR
         errorsTable = new JTable(new DefaultTableModel(
                 new Object[]{"#", "Tipo", "Descripción", "Línea", "Columna"}, 0
         ));
         JScrollPane errorsScroll = new JScrollPane(errorsTable);
 
-        //Tabs dentro de Output
         JTabbedPane outputTabs = new JTabbedPane();
         outputTabs.addTab("Tokens", tokensScroll);
         outputTabs.addTab("Errores", errorsScroll);
@@ -82,7 +94,11 @@ public class IdeFrame extends JFrame {
         JSplitPane rightSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, consoleScroll, outputScroll);
         rightSplit.setResizeWeight(0.55);
 
-        JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, editorScroll, rightSplit);
+        JSplitPane mainSplit = new JSplitPane(
+                JSplitPane.HORIZONTAL_SPLIT,
+                editorTabs,
+                rightSplit
+        );
         mainSplit.setResizeWeight(0.6);
 
         add(mainSplit, BorderLayout.CENTER);
@@ -90,7 +106,7 @@ public class IdeFrame extends JFrame {
         updateTitle();
     }
 
-    //barra superior
+    /* ====== Menu ====== */
     private JMenuBar buildMenuBar() {
         JMenuBar bar = new JMenuBar();
 
@@ -99,138 +115,199 @@ public class IdeFrame extends JFrame {
         JMenuItem nuevo = new JMenuItem("Nuevo");
         nuevo.addActionListener(e -> newFile());
 
-        JMenuItem abrir = new JMenuItem("Abrir.");
+        JMenuItem abrir = new JMenuItem("Abrir...");
         abrir.addActionListener(e -> openFile());
 
         JMenuItem guardar = new JMenuItem("Guardar");
         guardar.addActionListener(e -> saveFile());
 
-        JMenuItem guardarComo = new JMenuItem("Guardar como.");
+        JMenuItem guardarComo = new JMenuItem("Guardar como...");
         guardarComo.addActionListener(e -> saveFileAs());
+
+        JMenuItem cerrarPestana = new JMenuItem("Cerrar pestaña");
+        cerrarPestana.addActionListener(e -> closeCurrentTab());
 
         file.add(nuevo);
         file.add(abrir);
+        file.addSeparator();
         file.add(guardar);
         file.add(guardarComo);
+        file.addSeparator();
+        file.add(cerrarPestana);
 
         JMenu run = new JMenu("Ejecutar");
         JMenuItem ejecutar = new JMenuItem("Run");
         ejecutar.addActionListener(e -> runDemo());
         run.add(ejecutar);
 
-        bar.add(file);
-        bar.add(run);
-
         JMenu reportes = new JMenu("Reportes");
-
         JMenuItem html = new JMenuItem("Generar HTML");
         html.addActionListener(e -> generarHTMLReport());
-
         reportes.add(html);
 
+        bar.add(file);
+        bar.add(run);
         bar.add(reportes);
 
         return bar;
     }
 
-    private void installDirtyTracking() {
-        if (attachedDocument != null && dirtyListener != null) {
-            attachedDocument.removeDocumentListener(dirtyListener);
+    /* ====== Tabs helpers ====== */
+    private EditorTab currentTab() {
+        Component c = editorTabs.getSelectedComponent();
+        return (c == null) ? null : tabByComponent.get(c);
+    }
+
+    private void addNewTab(File file, String content) {
+        EditorTab tab = new EditorTab();
+        tab.file = file;
+
+        tab.area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        tab.area.setText(content);
+
+        JScrollPane scroll = new JScrollPane(tab.area);
+
+        // instalar tracking dirty por documento
+        installDirtyTracking(tab);
+
+        String title = tabTitle(tab);
+        editorTabs.addTab(title, scroll);
+        tabByComponent.put(scroll, tab);
+
+        editorTabs.setSelectedComponent(scroll);
+        updateTitle();
+    }
+
+    private String tabTitle(EditorTab tab) {
+        String base;
+        if (tab.file == null) {
+            base = "Nuevo " + untitledCounter;
+        } else {
+            base = tab.file.getName();
+        }
+        return (tab.dirty ? "*" : "") + base;
+    }
+
+    private void refreshCurrentTabTitle() {
+        EditorTab tab = currentTab();
+        if (tab == null) return;
+
+        Component c = editorTabs.getSelectedComponent();
+        int idx = editorTabs.indexOfComponent(c);
+        if (idx >= 0) editorTabs.setTitleAt(idx, tabTitle(tab));
+
+        updateTitle();
+    }
+
+    private void installDirtyTracking(EditorTab tab) {
+        if (tab.attachedDocument != null && tab.listener != null) {
+            tab.attachedDocument.removeDocumentListener(tab.listener);
         }
 
-        dirtyListener = new DocumentListener() {
+        tab.listener = new DocumentListener() {
             private void changed() {
-                if (suppressDirty) return;
-                if (!dirty) {
-                    dirty = true;
-                    updateTitle();
+                if (!tab.dirty) {
+                    tab.dirty = true;
+                    refreshCurrentTabTitle();
                 }
             }
-
             @Override public void insertUpdate(DocumentEvent e) { changed(); }
             @Override public void removeUpdate(DocumentEvent e) { changed(); }
             @Override public void changedUpdate(DocumentEvent e) { changed(); }
         };
 
-        attachedDocument = editor.getDocument();
-        attachedDocument.addDocumentListener(dirtyListener);
+        tab.attachedDocument = tab.area.getDocument();
+        tab.attachedDocument.addDocumentListener(tab.listener);
+
+        // al cargar texto inicial no queremos marcar dirty automáticamente
+        tab.dirty = false;
     }
 
     private void updateTitle() {
-        String name = (currentFile == null) ? "Nuevo archivo" : currentFile.getName();
-        setTitle("ELI NOSQL - " + (dirty ? "*" : "") + name);
+        EditorTab tab = currentTab();
+        if (tab == null) {
+            setTitle("ELI NOSQL");
+            return;
+        }
+        String name = (tab.file == null) ? "Nuevo" : tab.file.getName();
+        setTitle("ELI NOSQL - " + (tab.dirty ? "*" : "") + name);
     }
 
-    private boolean confirmDiscardIfNeeded() {
-        if (!dirty) return true;
+    /* ====== Confirmaciones ====== */
+    private boolean confirmSaveIfNeeded(EditorTab tab) {
+        if (tab == null || !tab.dirty) return true;
 
         int option = JOptionPane.showConfirmDialog(
                 this,
-                "Tienes cambios sin guardar. ¿Deseas guardarlos?",
+                "Tienes cambios sin guardar en \"" + tabTitle(tab).replace("*", "") + "\".\n¿Deseas guardarlos?",
                 "Cambios sin guardar",
                 JOptionPane.YES_NO_CANCEL_OPTION,
                 JOptionPane.WARNING_MESSAGE
         );
 
         if (option == JOptionPane.CANCEL_OPTION || option == JOptionPane.CLOSED_OPTION) return false;
-        if (option == JOptionPane.YES_OPTION) return saveFile(); // si cancela o falla, no continúa
-        return true; // NO = descartar cambios
+        if (option == JOptionPane.YES_OPTION) return saveSpecificTab(tab);
+        return true; // NO = descartar
     }
 
-    //Métodos
-    private void newFile() {
-        if (!confirmDiscardIfNeeded()) return;
-
-        suppressDirty = true;
-        try {
-            editor.setText("");
-        } finally {
-            suppressDirty = false;
+    private boolean confirmCloseAllTabs() {
+        for (Component c : tabByComponent.keySet()) {
+            EditorTab tab = tabByComponent.get(c);
+            if (tab != null && tab.dirty) {
+                // nos vamos una por una (si el usuario cancela, detenemos)
+                editorTabs.setSelectedComponent(c);
+                if (!confirmSaveIfNeeded(tab)) return false;
+            }
         }
+        return true;
+    }
 
-        installDirtyTracking();
-        currentFile = null;
-        dirty = false;
-        updateTitle();
+    /* ====== Acciones Archivo ====== */
+    private void newFile() {
+        addNewTab(null, "");
+        untitledCounter++;
     }
 
     private void openFile() {
-        if (!confirmDiscardIfNeeded()) return;
-
         JFileChooser chooser = new JFileChooser();
         int result = chooser.showOpenDialog(this);
 
         if (result == JFileChooser.APPROVE_OPTION) {
             File selected = chooser.getSelectedFile();
 
-            try (BufferedReader reader = new BufferedReader(new FileReader(selected))) {
-
-                suppressDirty = true;
-                try {
-                    editor.read(reader, null);
-                } finally {
-                    suppressDirty = false;
+            // si ya está abierto, solo enfocar
+            for (Map.Entry<Component, EditorTab> entry : tabByComponent.entrySet()) {
+                EditorTab t = entry.getValue();
+                if (t.file != null && t.file.equals(selected)) {
+                    editorTabs.setSelectedComponent(entry.getKey());
+                    return;
                 }
+            }
 
-                installDirtyTracking();
-                currentFile = selected;
-                dirty = false;
-                updateTitle();
-
+            try {
+                String content = Files.readString(selected.toPath(), StandardCharsets.UTF_8);
+                addNewTab(selected, content);
             } catch (IOException ex) {
-                suppressDirty = false;
                 JOptionPane.showMessageDialog(this, "Error al abrir archivo: " + ex.getMessage());
             }
         }
     }
 
     private boolean saveFile() {
-        if (currentFile == null) return saveFileAs();
+        EditorTab tab = currentTab();
+        if (tab == null) return false;
+        return saveSpecificTab(tab);
+    }
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(currentFile))) {
-            editor.write(writer);
-            dirty = false;
-            updateTitle();
+    private boolean saveSpecificTab(EditorTab tab) {
+        if (tab.file == null) return saveFileAs(tab);
+
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+                new FileOutputStream(tab.file), StandardCharsets.UTF_8
+        ))) {
+            tab.area.write(writer);
+            tab.dirty = false;
+            refreshCurrentTabTitle();
             return true;
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, "Error al guardar archivo: " + ex.getMessage());
@@ -239,21 +316,44 @@ public class IdeFrame extends JFrame {
     }
 
     private boolean saveFileAs() {
+        EditorTab tab = currentTab();
+        if (tab == null) return false;
+        return saveFileAs(tab);
+    }
+
+    private boolean saveFileAs(EditorTab tab) {
         JFileChooser chooser = new JFileChooser();
         int result = chooser.showSaveDialog(this);
 
         if (result == JFileChooser.APPROVE_OPTION) {
-            currentFile = chooser.getSelectedFile();
-            return saveFile();
+            tab.file = chooser.getSelectedFile();
+            boolean ok = saveSpecificTab(tab);
+            refreshCurrentTabTitle();
+            return ok;
         }
         return false;
     }
 
-    //llena la tabla con la lista de tokens + errores léxicos
-    // llena la tabla con la lista de tokens + errores léxicos
-// retorna true si hubo al menos 1 error léxico
-    // llena la tabla con la lista de tokens + errores léxicos
-// retorna true si hubo al menos 1 error léxico
+    private void closeCurrentTab() {
+        EditorTab tab = currentTab();
+        if (tab == null) return;
+
+        if (!confirmSaveIfNeeded(tab)) return;
+
+        Component c = editorTabs.getSelectedComponent();
+        tabByComponent.remove(c);
+        editorTabs.remove(c);
+
+        // si ya no quedan pestañas, crea una nueva
+        if (editorTabs.getTabCount() == 0) {
+            addNewTab(null, "");
+            untitledCounter++;
+        }
+
+        updateTitle();
+    }
+
+    /* ====== Analisis ====== */
     private boolean fillTokensAndLexErrors(String input) {
         DefaultTableModel tok = (DefaultTableModel) tokensTable.getModel();
         DefaultTableModel err = (DefaultTableModel) errorsTable.getModel();
@@ -313,9 +413,12 @@ public class IdeFrame extends JFrame {
 
     private void runDemo() {
         console.setText("");
-        String input = editor.getText();
 
-        // 1) Tokens + errores léxicos
+        EditorTab tab = currentTab();
+        if (tab == null) return;
+
+        String input = tab.area.getText();
+
         // 1) Tokens + errores léxicos
         boolean hasLexError = fillTokensAndLexErrors(input);
         if (hasLexError) {
@@ -333,7 +436,7 @@ public class IdeFrame extends JFrame {
             analizadores.Sintactico parser = new analizadores.Sintactico(
                     lex2,
                     msg -> console.append(msg + "\n"),
-                    row -> { // row = {tipo, desc, lin, col}
+                    row -> {
                         errModel.addRow(new Object[]{
                                 nErr[0]++,
                                 row[0],
@@ -345,17 +448,14 @@ public class IdeFrame extends JFrame {
             );
 
             parser.parse();
-
             console.append(">> Análisis completado: SIN errores.\n");
         } catch (Exception ex) {
             console.append(">> Error en análisis: " + ex.getMessage() + "\n");
         }
     }
 
-    //representación del token
     private String tipoEnunciado(String tokenName) {
         return switch (tokenName) {
-
             case "ID" -> "id";
             case "ENTERO" -> "int";
             case "DECIMAL" -> "float";
@@ -363,7 +463,6 @@ public class IdeFrame extends JFrame {
             case "TRUE", "FALSE" -> "bool";
             case "NULL" -> "null";
 
-            //clasificación útil
             case "DATABASE", "USE", "TABLE", "READ", "FIELDS", "FILTER", "STORE", "AT",
                  "EXPORT", "ADD", "UPDATE", "SET", "CLEAR" -> "keyword";
 
@@ -374,12 +473,11 @@ public class IdeFrame extends JFrame {
             case "PUNTO_COMA", "COMA", "DOS_PUNTOS" -> "symbol";
 
             case "ERROR" -> "error";
-
             default -> tokenName;
         };
     }
 
-    //reporte html
+    /* ====== Reporte HTML ====== */
     private void generarHTMLReport() {
         try {
             DefaultTableModel tok = (DefaultTableModel) tokensTable.getModel();
@@ -417,9 +515,7 @@ public class IdeFrame extends JFrame {
         sb.append("<h1>Reporte ELI-NOSQL</h1>")
                 .append("<p>Generado: ").append(LocalDateTime.now()).append("</p>");
 
-        // TOKENS
-        sb.append("<h2>Tabla de Tokens</h2>");
-        sb.append("<table><tr>");
+        sb.append("<h2>Tabla de Tokens</h2><table><tr>");
         for (int c = 0; c < tok.getColumnCount(); c++) sb.append("<th>").append(tok.getColumnName(c)).append("</th>");
         sb.append("</tr>");
         for (int r = 0; r < tok.getRowCount(); r++) {
@@ -432,9 +528,7 @@ public class IdeFrame extends JFrame {
         }
         sb.append("</table>");
 
-        // ERRORES
-        sb.append("<h2>Tabla de Errores</h2>");
-        sb.append("<table><tr>");
+        sb.append("<h2>Tabla de Errores</h2><table><tr>");
         for (int c = 0; c < err.getColumnCount(); c++) sb.append("<th>").append(err.getColumnName(c)).append("</th>");
         sb.append("</tr>");
         for (int r = 0; r < err.getRowCount(); r++) {
