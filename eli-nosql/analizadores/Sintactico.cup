@@ -81,8 +81,9 @@ terminal String ERROR;
 non terminal LinkedList<Instruccion> program, stmts;
 non terminal Instruccion stmt, db_def, use_def, table_def;
 non terminal Instruccion read_stmt, export_stmt, add_stmt, update_stmt, clear_stmt;
+non terminal String store_opt;
 
-non terminal store_opt, col_list, col_decl, type_def;
+non terminal col_list, col_decl, type_def;
 non terminal field_decl, filter_decl, id_list, expr;
 non terminal pair_list, pair_assign;
 non terminal assign_list, assign_elem;
@@ -122,8 +123,8 @@ stmts
   ;
 
 stmt
-  ::= use_def:u  {: RESULT = u; :}
-   |  db_def
+  ::= use_def:u       {: RESULT = u; :}
+   |  db_def:d        {: RESULT = d; :}
    |  table_def
    |  read_stmt
    |  export_stmt
@@ -134,15 +135,30 @@ stmt
    |  error LLAVE_CIERRA  {: RESULT = null; :}
   ;
 
-/* 1. DATABASE (No lleva ';' al final de la llave) */
+/* 1. DATABASE */
 db_def
-  ::= DATABASE ID LLAVE_ABRE store_opt LLAVE_CIERRA
+  ::= DATABASE ID:id LLAVE_ABRE store_opt:ruta LLAVE_CIERRA
+      {:
+         // Instanciamos el nodo CrearBD pasándole el ID y la ruta
+         RESULT = new CrearBD(id, ruta);
+      :}
    |  DATABASE ID LLAVE_ABRE error LLAVE_CIERRA
+      {:
+         RESULT = null;
+      :}
   ;
 
 store_opt
-  ::= STORE AT CADENA PUNTO_COMA
+  ::= STORE AT CADENA:c PUNTO_COMA
+      {:
+         // Si el usuario especifica la ruta, la devolvemos
+         RESULT = c;
+      :}
    |  /* vacio */
+      {:
+         // Si la omite, el manual dice que usamos una por defecto
+         RESULT = "ruta_por_defecto.json";
+      :}
   ;
 
 /* 2. USE */

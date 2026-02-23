@@ -489,7 +489,10 @@ class CUP$Sintactico$actions {
           case 5: // stmt ::= db_def 
             {
               Instruccion RESULT =null;
-
+		int dleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).left;
+		int dright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).right;
+		Instruccion d = (Instruccion)((java_cup.runtime.Symbol) CUP$Sintactico$stack.peek()).value;
+		 RESULT = d; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("stmt",2, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -570,7 +573,16 @@ class CUP$Sintactico$actions {
           case 14: // db_def ::= DATABASE ID LLAVE_ABRE store_opt LLAVE_CIERRA 
             {
               Instruccion RESULT =null;
-
+		int idleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).left;
+		int idright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).right;
+		String id = (String)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).value;
+		int rutaleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).left;
+		int rutaright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).right;
+		String ruta = (String)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).value;
+		
+         // Instanciamos el nodo CrearBD pasándole el ID y la ruta
+         RESULT = new CrearBD(id, ruta);
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("db_def",3, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-4)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -579,7 +591,9 @@ class CUP$Sintactico$actions {
           case 15: // db_def ::= DATABASE ID LLAVE_ABRE error LLAVE_CIERRA 
             {
               Instruccion RESULT =null;
-
+		
+         RESULT = null;
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("db_def",3, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-4)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -587,8 +601,14 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 16: // store_opt ::= STORE AT CADENA PUNTO_COMA 
             {
-              Object RESULT =null;
-
+              String RESULT =null;
+		int cleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).left;
+		int cright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).right;
+		String c = (String)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).value;
+		
+         // Si el usuario especifica la ruta, la devolvemos
+         RESULT = c;
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("store_opt",11, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -596,8 +616,11 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 17: // store_opt ::= 
             {
-              Object RESULT =null;
-
+              String RESULT =null;
+		
+         // Si la omite, el manual dice que usamos una por defecto
+         RESULT = "ruta_por_defecto.json";
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("store_opt",11, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
