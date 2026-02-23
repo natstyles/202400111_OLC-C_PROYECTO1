@@ -82,8 +82,11 @@ non terminal LinkedList<Instruccion> program, stmts;
 non terminal Instruccion stmt, db_def, use_def, table_def;
 non terminal Instruccion read_stmt, export_stmt, add_stmt, update_stmt, clear_stmt;
 non terminal String store_opt;
+non terminal java.util.LinkedList<ejecucion.Columna> col_list;
+non terminal ejecucion.Columna col_decl;
+non terminal String type_def;
 
-non terminal col_list, col_decl, type_def;
+/* BORRAR DESPUES DE NUEVA INSTANCIA */
 non terminal field_decl, filter_decl, id_list, expr;
 non terminal pair_list, pair_assign;
 non terminal assign_list, assign_elem;
@@ -125,7 +128,7 @@ stmts
 stmt
   ::= use_def:u       {: RESULT = u; :}
    |  db_def:d        {: RESULT = d; :}
-   |  table_def
+   |  table_def:t     {: RESULT = t; :}
    |  read_stmt
    |  export_stmt
    |  add_stmt
@@ -175,23 +178,46 @@ use_def
       :}
   ;
 
-/* 3. TABLE (No lleva ';' al final de la llave) */
+/* 3. TABLE */
 table_def
-  ::= TABLE ID LLAVE_ABRE col_list LLAVE_CIERRA
+  ::= TABLE ID:id LLAVE_ABRE col_list:cols LLAVE_CIERRA
+      {:
+         RESULT = new CrearTabla(id, cols);
+      :}
    |  TABLE ID LLAVE_ABRE error LLAVE_CIERRA
+      {:
+         RESULT = null;
+      :}
   ;
 
 col_list
-  ::= col_list col_decl
-   |  col_decl
+  ::= col_list:lista col_decl:col
+      {:
+         if(col != null) lista.add(col);
+         RESULT = lista;
+      :}
+   |  col_decl:col
+      {:
+         java.util.LinkedList<ejecucion.Columna> lista = new java.util.LinkedList<>();
+         if(col != null) lista.add(col);
+         RESULT = lista;
+      :}
   ;
 
 col_decl
-  ::= ID DOS_PUNTOS type_def PUNTO_COMA
+  ::= ID:id DOS_PUNTOS type_def:tipo PUNTO_COMA
+      {:
+         RESULT = new Columna(id, tipo);
+      :}
   ;
 
 type_def
-  ::= T_INT | T_STRING | T_FLOAT | T_BOOL | T_ARRAY | T_OBJECT
+  ::= T_INT     {: RESULT = "int"; :}
+   |  T_STRING  {: RESULT = "string"; :}
+   |  T_FLOAT   {: RESULT = "float"; :}
+   |  T_BOOL    {: RESULT = "bool"; :}
+   |  T_ARRAY   {: RESULT = "array"; :}
+   |  T_OBJECT  {: RESULT = "object"; :}
   ;
 
 /* 4. READ (SÍ lleva ';' al final de la llave) */

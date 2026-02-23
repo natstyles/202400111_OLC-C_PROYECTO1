@@ -4,7 +4,6 @@ public class CrearBD implements Instruccion {
     private String nombreBD;
     private String rutaArchivo;
 
-    // El constructor recibe el ID de la base de datos y la ruta del archivo JSON
     public CrearBD(String nombreBD, String rutaArchivo) {
         this.nombreBD = nombreBD;
         this.rutaArchivo = rutaArchivo;
@@ -12,9 +11,11 @@ public class CrearBD implements Instruccion {
 
     @Override
     public Object ejecutar(Entorno ent) {
-        // Por ahora solo imprimiremos el mensaje.
-        // Más adelante, en la "Capa de Persistencia", aquí llamaremos al método que crea el archivo JSON real.
-        System.out.println(">> EXITO: Base de datos '" + this.nombreBD + "' definida. Persistencia en: " + this.rutaArchivo);
+        // Registramos en memoria que esta base de datos YA EXISTE
+        // Guardamos su ruta por si la necesitamos después
+        ent.guardar("DB_" + this.nombreBD, this.rutaArchivo);
+
+        System.out.println(">> ÉXITO: Base de datos '" + this.nombreBD + "' definida. Persistencia en: " + this.rutaArchivo);
         return null;
     }
 }

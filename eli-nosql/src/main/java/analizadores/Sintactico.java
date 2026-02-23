@@ -501,7 +501,10 @@ class CUP$Sintactico$actions {
           case 6: // stmt ::= table_def 
             {
               Instruccion RESULT =null;
-
+		int tleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).left;
+		int tright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).right;
+		Instruccion t = (Instruccion)((java_cup.runtime.Symbol) CUP$Sintactico$stack.peek()).value;
+		 RESULT = t; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("stmt",2, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -656,7 +659,15 @@ class CUP$Sintactico$actions {
           case 20: // table_def ::= TABLE ID LLAVE_ABRE col_list LLAVE_CIERRA 
             {
               Instruccion RESULT =null;
-
+		int idleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).left;
+		int idright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).right;
+		String id = (String)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).value;
+		int colsleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).left;
+		int colsright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).right;
+		java.util.LinkedList<ejecucion.Columna> cols = (java.util.LinkedList<ejecucion.Columna>)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).value;
+		
+         RESULT = new CrearTabla(id, cols);
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("table_def",5, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-4)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -665,7 +676,9 @@ class CUP$Sintactico$actions {
           case 21: // table_def ::= TABLE ID LLAVE_ABRE error LLAVE_CIERRA 
             {
               Instruccion RESULT =null;
-
+		
+         RESULT = null;
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("table_def",5, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-4)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -673,8 +686,17 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 22: // col_list ::= col_list col_decl 
             {
-              Object RESULT =null;
-
+              java.util.LinkedList<ejecucion.Columna> RESULT =null;
+		int listaleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).left;
+		int listaright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).right;
+		java.util.LinkedList<ejecucion.Columna> lista = (java.util.LinkedList<ejecucion.Columna>)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).value;
+		int colleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).left;
+		int colright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).right;
+		ejecucion.Columna col = (ejecucion.Columna)((java_cup.runtime.Symbol) CUP$Sintactico$stack.peek()).value;
+		
+         if(col != null) lista.add(col);
+         RESULT = lista;
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("col_list",12, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -682,8 +704,15 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 23: // col_list ::= col_decl 
             {
-              Object RESULT =null;
-
+              java.util.LinkedList<ejecucion.Columna> RESULT =null;
+		int colleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).left;
+		int colright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).right;
+		ejecucion.Columna col = (ejecucion.Columna)((java_cup.runtime.Symbol) CUP$Sintactico$stack.peek()).value;
+		
+         java.util.LinkedList<ejecucion.Columna> lista = new java.util.LinkedList<>();
+         if(col != null) lista.add(col);
+         RESULT = lista;
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("col_list",12, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -691,8 +720,16 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 24: // col_decl ::= ID DOS_PUNTOS type_def PUNTO_COMA 
             {
-              Object RESULT =null;
-
+              ejecucion.Columna RESULT =null;
+		int idleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).left;
+		int idright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).right;
+		String id = (String)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)).value;
+		int tipoleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).left;
+		int tiporight = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).right;
+		String tipo = (String)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).value;
+		
+         RESULT = new Columna(id, tipo);
+      
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("col_decl",13, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-3)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -700,8 +737,8 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 25: // type_def ::= T_INT 
             {
-              Object RESULT =null;
-
+              String RESULT =null;
+		 RESULT = "int"; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("type_def",14, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -709,8 +746,8 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 26: // type_def ::= T_STRING 
             {
-              Object RESULT =null;
-
+              String RESULT =null;
+		 RESULT = "string"; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("type_def",14, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -718,8 +755,8 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 27: // type_def ::= T_FLOAT 
             {
-              Object RESULT =null;
-
+              String RESULT =null;
+		 RESULT = "float"; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("type_def",14, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -727,8 +764,8 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 28: // type_def ::= T_BOOL 
             {
-              Object RESULT =null;
-
+              String RESULT =null;
+		 RESULT = "bool"; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("type_def",14, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -736,8 +773,8 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 29: // type_def ::= T_ARRAY 
             {
-              Object RESULT =null;
-
+              String RESULT =null;
+		 RESULT = "array"; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("type_def",14, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -745,8 +782,8 @@ class CUP$Sintactico$actions {
           /*. . . . . . . . . . . . . . . . . . . .*/
           case 30: // type_def ::= T_OBJECT 
             {
-              Object RESULT =null;
-
+              String RESULT =null;
+		 RESULT = "object"; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("type_def",14, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
