@@ -85,12 +85,14 @@ non terminal String store_opt;
 non terminal java.util.LinkedList<ejecucion.Columna> col_list;
 non terminal ejecucion.Columna col_decl;
 non terminal String type_def;
+non terminal java.util.LinkedList<ejecucion.Asignacion> pair_list;
+non terminal ejecucion.Asignacion pair_assign;
+non terminal ejecucion.Expresion value;
 
-/* BORRAR DESPUES DE NUEVA INSTANCIA */
+/* AÚN NO TIPADOS (SE ACTUALIZARÁN DESPUÉS) */
 non terminal field_decl, filter_decl, id_list, expr;
-non terminal pair_list, pair_assign;
 non terminal assign_list, assign_elem;
-non terminal value, array_def, val_list;
+non terminal array_def, val_list;
 
 /* ====== PRECEDENCIAS ====== */
 precedence left OR;
@@ -131,7 +133,7 @@ stmt
    |  table_def:t     {: RESULT = t; :}
    |  read_stmt
    |  export_stmt
-   |  add_stmt
+   |  add_stmt:a      {: RESULT = a; :}
    |  update_stmt
    |  clear_stmt
    |  error PUNTO_COMA    {: RESULT = null; :}
@@ -259,27 +261,35 @@ export_stmt
    |  EXPORT error PUNTO_COMA
   ;
 
-/* 6. ADD (SÍ lleva ';' al final de la llave) */
+/* 6. ADD: add <id> { campo: valor, ... }; */
 add_stmt
-  ::= ADD ID LLAVE_ABRE pair_list LLAVE_CIERRA PUNTO_COMA
-
-   /* Faltó ';' al final del bloque */
-   |  ADD ID LLAVE_ABRE pair_list LLAVE_CIERRA:c
-      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'add'", cleft, cright); :}
-
-   /* Modo Pánico interno */
+  ::= ADD ID:id LLAVE_ABRE pair_list:pares LLAVE_CIERRA PUNTO_COMA
+      {:
+         RESULT = new Insertar(id, pares);
+      :}
    |  ADD ID LLAVE_ABRE error LLAVE_CIERRA PUNTO_COMA
-   |  ADD ID LLAVE_ABRE error LLAVE_CIERRA:c
-      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'add'", cleft, cright); :}
+      {: RESULT = null; :}
   ;
 
 pair_list
-  ::= pair_list COMA pair_assign
-   |  pair_assign
+  ::= pair_list:lista COMA pair_assign:par
+      {:
+         if(par != null) lista.add(par);
+         RESULT = lista;
+      :}
+   |  pair_assign:par
+      {:
+         java.util.LinkedList<ejecucion.Asignacion> lista = new java.util.LinkedList<>();
+         if(par != null) lista.add(par);
+         RESULT = lista;
+      :}
   ;
 
 pair_assign
-  ::= ID DOS_PUNTOS value
+  ::= ID:id DOS_PUNTOS value:val
+      {:
+         RESULT = new Asignacion(id, val);
+      :}
   ;
 
 /* 7. UPDATE (SÍ lleva ';' al final de la llave) */
@@ -314,15 +324,14 @@ clear_stmt
    |  CLEAR error PUNTO_COMA
   ;
 
-/* Valores y Arreglos */
+/* Valores Literales (Conectados al nodo Literal.java) */
 value
-  ::= CADENA
-   |  ENTERO
-   |  DECIMAL
-   |  TRUE
-   |  FALSE
-   |  NULL
-   |  array_def
+  ::= CADENA:c  {: RESULT = new Literal(c, "string"); :}
+   |  ENTERO:e  {: RESULT = new Literal(Integer.parseInt(e), "int"); :}
+   |  DECIMAL:d {: RESULT = new Literal(Double.parseDouble(d), "float"); :}
+   |  TRUE      {: RESULT = new Literal(true, "bool"); :}
+   |  FALSE     {: RESULT = new Literal(false, "bool"); :}
+   |  NULL      {: RESULT = new Literal(null, "null"); :}
   ;
 
 array_def
