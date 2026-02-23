@@ -1,6 +1,8 @@
 package analizadores;
 
 import java_cup.runtime.Symbol;
+import ejecucion.*;
+import java.util.LinkedList;
 
 parser code {:
     // Variables para conectar con la Interfaz Grafica
@@ -76,11 +78,14 @@ terminal String ID, CADENA, ENTERO, DECIMAL;
 terminal String ERROR;
 
 /* ====== NO TERMINALES ====== */
-non terminal program, stmts, stmt;
-non terminal db_def, store_opt, use_def, table_def, col_list, col_decl, type_def;
-non terminal read_stmt, field_decl, filter_decl, id_list, expr;
-non terminal export_stmt, add_stmt, pair_list, pair_assign;
-non terminal update_stmt, assign_list, assign_elem, clear_stmt;
+non terminal LinkedList<Instruccion> program, stmts;
+non terminal Instruccion stmt, db_def, use_def, table_def;
+non terminal Instruccion read_stmt, export_stmt, add_stmt, update_stmt, clear_stmt;
+
+non terminal store_opt, col_list, col_decl, type_def;
+non terminal field_decl, filter_decl, id_list, expr;
+non terminal pair_list, pair_assign;
+non terminal assign_list, assign_elem;
 non terminal value, array_def, val_list;
 
 /* ====== PRECEDENCIAS ====== */
@@ -94,27 +99,39 @@ start with program;
 %%
 
 /* ================= GRAMATICA ================= */
-
 program
-  ::= stmts
+  ::= stmts:s
+      {:
+         //devuelve la lista completa de instrucciones
+         RESULT = s;
+      :}
   ;
 
 stmts
-  ::= stmts stmt
-   |  /* vacio */
+  ::= stmts:lista stmt:s
+      {:
+         //agregar la instrucción a la lista
+         if (s != null) lista.add(s);
+         RESULT = lista;
+      :}
+   |  /* empty */
+      {:
+         //crear la lista vacía
+         RESULT = new LinkedList<>();
+      :}
   ;
 
 stmt
-  ::= db_def
-   |  use_def
+  ::= use_def:u  {: RESULT = u; :}
+   |  db_def
    |  table_def
    |  read_stmt
    |  export_stmt
    |  add_stmt
    |  update_stmt
    |  clear_stmt
-   |  error PUNTO_COMA
-   |  error LLAVE_CIERRA
+   |  error PUNTO_COMA    {: RESULT = null; :}
+   |  error LLAVE_CIERRA  {: RESULT = null; :}
   ;
 
 /* 1. DATABASE (No lleva ';' al final de la llave) */
@@ -130,8 +147,16 @@ store_opt
 
 /* 2. USE */
 use_def
-  ::= USE ID PUNTO_COMA
+  ::= USE ID:id PUNTO_COMA
+      {:
+         // ¡AQUÍ ESTÁ LA MAGIA! Instanciamos nuestro nodo del AST
+         RESULT = new UseDB(id);
+      :}
    |  USE error PUNTO_COMA
+      {:
+         // Si hubo error, devolvemos null para no meter basura al AST
+         RESULT = null;
+      :}
   ;
 
 /* 3. TABLE (No lleva ';' al final de la llave) */

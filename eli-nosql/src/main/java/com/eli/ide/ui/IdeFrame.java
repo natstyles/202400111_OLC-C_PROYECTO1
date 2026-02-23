@@ -479,7 +479,7 @@ public class IdeFrame extends JFrame {
         }
 
         // 2) Parse + capturar errores sintácticos
-        DefaultTableModel errModel = (DefaultTableModel) errorsTable.getModel();
+        javax.swing.table.DefaultTableModel errModel = (javax.swing.table.DefaultTableModel) errorsTable.getModel();
         final int[] nErr = { errModel.getRowCount() + 1 };
 
         try {
@@ -499,18 +499,52 @@ public class IdeFrame extends JFrame {
                     }
             );
 
-            // Ejecutamos el parser
-            parser.parse();
+            // 3) Ejecutamos el parser y capturamos la raíz del AST
+            java_cup.runtime.Symbol symRaiz = parser.parse();
 
-            // Comprobamos la bandera de errores que configuramos en CUP
+            // 4) Comprobamos la bandera de errores que configuramos en CUP
             if (parser.hayErrores) {
                 console.append(">> Análisis finalizado. Se encontraron ERRORES SINTÁCTICOS. Revisa la tabla de errores.\n");
             } else {
                 console.append(">> Análisis completado: SIN errores.\n");
+
+                // =========================================================
+                //  INICIO DE LA EJECUCIÓN DEL ÁRBOL (AST)
+                // =========================================================
+                console.append("\n>> --- INICIANDO EJECUCIÓN --- \n");
+
+                // Verificamos que el árbol no venga vacío
+                if (symRaiz != null && symRaiz.value != null) {
+
+                    // Creamos la memoria global (Entorno)
+                    ejecucion.Entorno entornoGlobal = new ejecucion.Entorno(null);
+
+                    // Extraemos la lista de instrucciones de la raíz
+                    @SuppressWarnings("unchecked")
+                    java.util.LinkedList<ejecucion.Instruccion> ast =
+                            (java.util.LinkedList<ejecucion.Instruccion>) symRaiz.value;
+
+                    // Recorremos y ejecutamos cada instrucción
+                    for (ejecucion.Instruccion inst : ast) {
+                        if (inst != null) {
+                            // Al llamar a ejecutar, la instrucción hace su trabajo en memoria
+                            // Puedes modificar luego la interfaz para que devuelva un String y pintarlo aquí
+                            inst.ejecutar(entornoGlobal);
+                        }
+                    }
+
+                    // Si la instrucción imprimió en consola (System.out), lo ideal más adelante
+                    // es pasarle la consola de la UI al entorno para imprimirlo directo ahí.
+                    console.append(">> --- EJECUCIÓN FINALIZADA --- \n");
+
+                } else {
+                    console.append(">> El código no contiene instrucciones ejecutables.\n");
+                }
             }
 
         } catch (Exception ex) {
             console.append(">> Error fatal en el análisis: No se pudo continuar compilando.\n");
+            ex.printStackTrace(); // Muy útil para depurar si falla el casteo del AST
         }
     }
 
