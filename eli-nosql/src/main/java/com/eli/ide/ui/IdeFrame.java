@@ -6,6 +6,7 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 import java.awt.*;
 import java.awt.Desktop;
@@ -21,6 +22,11 @@ import java_cup.runtime.Symbol;
 import analizadores.sym;
 
 public class IdeFrame extends JFrame {
+
+    /* ====== File chooser ====== */
+    private final JFileChooser fileChooser = new JFileChooser();
+    private final FileNameExtensionFilter eliFilter =
+            new FileNameExtensionFilter("Archivos ELI (*.eli)", "eli");
 
     /* ====== Multi-tab editor ====== */
     private final JTabbedPane editorTabs = new JTabbedPane();
@@ -59,6 +65,8 @@ public class IdeFrame extends JFrame {
         setLocationRelativeTo(null);
 
         setJMenuBar(buildMenuBar());
+
+        setupFileChooser();
 
         // ===== Editor Tabs =====
         editorTabs.setBorder(new TitledBorder("Editor"));
@@ -104,6 +112,22 @@ public class IdeFrame extends JFrame {
         add(mainSplit, BorderLayout.CENTER);
 
         updateTitle();
+    }
+
+    private void setupFileChooser() {
+        fileChooser.resetChoosableFileFilters();
+        fileChooser.setFileFilter(eliFilter);
+        fileChooser.setAcceptAllFileFilterUsed(true);
+    }
+
+    private static boolean hasEliExtension(File f) {
+        return f != null && f.getName().toLowerCase().endsWith(".eli");
+    }
+
+    private static File ensureEliExtension(File f) {
+        if (f == null) return null;
+        if (hasEliExtension(f)) return f;
+        return new File(f.getParentFile(), f.getName() + ".eli");
     }
 
     /* ====== Menu ====== */
@@ -269,11 +293,21 @@ public class IdeFrame extends JFrame {
     }
 
     private void openFile() {
-        JFileChooser chooser = new JFileChooser();
-        int result = chooser.showOpenDialog(this);
+        fileChooser.setDialogTitle("Abrir archivo (.eli)");
+        int result = fileChooser.showOpenDialog(this);
 
         if (result == JFileChooser.APPROVE_OPTION) {
-            File selected = chooser.getSelectedFile();
+            File selected = fileChooser.getSelectedFile();
+
+            if (!hasEliExtension(selected)) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Solo se permiten archivos con extensión .eli",
+                        "Archivo inválido",
+                        JOptionPane.WARNING_MESSAGE
+                );
+                return;
+            }
 
             // si ya está abierto, solo enfocar
             for (Map.Entry<Component, EditorTab> entry : tabByComponent.entrySet()) {
@@ -302,6 +336,9 @@ public class IdeFrame extends JFrame {
     private boolean saveSpecificTab(EditorTab tab) {
         if (tab.file == null) return saveFileAs(tab);
 
+        //Por si el archivo se asignó sin extensión (o el usuario tecleó sin .eli)
+        tab.file = ensureEliExtension(tab.file);
+
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
                 new FileOutputStream(tab.file), StandardCharsets.UTF_8
         ))) {
@@ -322,11 +359,26 @@ public class IdeFrame extends JFrame {
     }
 
     private boolean saveFileAs(EditorTab tab) {
-        JFileChooser chooser = new JFileChooser();
-        int result = chooser.showSaveDialog(this);
+        fileChooser.setDialogTitle("Guardar como (.eli)");
+        int result = fileChooser.showSaveDialog(this);
 
         if (result == JFileChooser.APPROVE_OPTION) {
-            tab.file = chooser.getSelectedFile();
+            File chosen = fileChooser.getSelectedFile();
+            File target = ensureEliExtension(chosen);
+
+            //Confirmar sobrescritura si existe
+            if (target.exists()) {
+                int opt = JOptionPane.showConfirmDialog(
+                        this,
+                        "El archivo ya existe:\n" + target.getName() + "\n¿Deseas sobrescribirlo?",
+                        "Confirmar",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE
+                );
+                if (opt != JOptionPane.YES_OPTION) return false;
+            }
+
+            tab.file = target;
             boolean ok = saveSpecificTab(tab);
             refreshCurrentTabTitle();
             return ok;
