@@ -88,10 +88,13 @@ non terminal String type_def;
 non terminal java.util.LinkedList<ejecucion.Asignacion> pair_list;
 non terminal ejecucion.Asignacion pair_assign;
 non terminal ejecucion.Expresion value;
+non terminal ejecucion.Expresion expr;
+non terminal ejecucion.Expresion filter_decl;
+non terminal java.util.LinkedList<ejecucion.Asignacion> assign_list;
+non terminal ejecucion.Asignacion assign_elem;
 
 /* AÚN NO TIPADOS (SE ACTUALIZARÁN DESPUÉS) */
-non terminal field_decl, filter_decl, id_list, expr;
-non terminal assign_list, assign_elem;
+non terminal field_decl, id_list;
 non terminal array_def, val_list;
 
 /* ====== PRECEDENCIAS ====== */
@@ -134,7 +137,7 @@ stmt
    |  read_stmt
    |  export_stmt
    |  add_stmt:a      {: RESULT = a; :}
-   |  update_stmt
+   |  update_stmt:u   {: RESULT = u; :}
    |  clear_stmt
    |  error PUNTO_COMA    {: RESULT = null; :}
    |  error LLAVE_CIERRA  {: RESULT = null; :}
@@ -252,7 +255,8 @@ id_list
   ;
 
 filter_decl
-  ::= FILTER DOS_PUNTOS expr PUNTO_COMA
+  ::= FILTER DOS_PUNTOS expr:e PUNTO_COMA
+      {: RESULT = e; :}
   ;
 
 /* 5. EXPORT */
@@ -292,30 +296,44 @@ pair_assign
       :}
   ;
 
-/* 7. UPDATE (SÍ lleva ';' al final de la llave) */
+/* 7. UPDATE */
 update_stmt
-  ::= UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA filter_decl LLAVE_CIERRA PUNTO_COMA
-   |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA LLAVE_CIERRA PUNTO_COMA
+  ::= UPDATE ID:id LLAVE_ABRE SET DOS_PUNTOS assign_list:asigs PUNTO_COMA filter_decl:f LLAVE_CIERRA PUNTO_COMA
+      {: RESULT = new Actualizar(id, asigs, f); :}
 
-   /* Faltó ';' al final del bloque */
+   |  UPDATE ID:id LLAVE_ABRE SET DOS_PUNTOS assign_list:asigs PUNTO_COMA LLAVE_CIERRA PUNTO_COMA
+      {: RESULT = new Actualizar(id, asigs, null); :}
+
+   /* ---- PANIC MODE (Devuelven null para no ensuciar el AST) ---- */
    |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA filter_decl LLAVE_CIERRA:c
-      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); :}
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); RESULT = null; :}
    |  UPDATE ID LLAVE_ABRE SET DOS_PUNTOS assign_list PUNTO_COMA LLAVE_CIERRA:c
-      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); :}
-
-   /* Modo Pánico interno */
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); RESULT = null; :}
    |  UPDATE ID LLAVE_ABRE error LLAVE_CIERRA PUNTO_COMA
+      {: RESULT = null; :}
    |  UPDATE ID LLAVE_ABRE error LLAVE_CIERRA:c
-      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); :}
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'update'", cleft, cright); RESULT = null; :}
   ;
 
 assign_list
-  ::= assign_list COMA assign_elem
-   |  assign_elem
+  ::= assign_list:lista COMA assign_elem:asig
+      {:
+         if(asig != null) lista.add(asig);
+         RESULT = lista;
+      :}
+   |  assign_elem:asig
+      {:
+         java.util.LinkedList<ejecucion.Asignacion> lista = new java.util.LinkedList<>();
+         if(asig != null) lista.add(asig);
+         RESULT = lista;
+      :}
   ;
 
 assign_elem
-  ::= ID IGUAL value
+  ::= ID:id IGUAL value:v
+      {:
+         RESULT = new Asignacion(id, v);
+      :}
   ;
 
 /* 8. CLEAR */
@@ -344,16 +362,17 @@ val_list
    |  value
   ;
 
-/* Expresiones */
+/* Expresiones Lógicas y Relacionales */
 expr
-  ::= expr OR expr
-   |  expr AND expr
-   |  NOT expr
-   |  PAR_ABRE expr PAR_CIERRA
-   |  ID IGUAL_IGUAL value
-   |  ID DIFERENTE value
-   |  ID MAYOR value
-   |  ID MENOR value
-   |  ID MAYOR_IGUAL value
-   |  ID MENOR_IGUAL value
+  ::= expr:i OR expr:d            {: RESULT = new Logica(i, "OR", d); :}
+   |  expr:i AND expr:d           {: RESULT = new Logica(i, "AND", d); :}
+   |  NOT expr:d                  {: RESULT = new Logica(null, "NOT", d); :}
+   |  PAR_ABRE expr:e PAR_CIERRA  {: RESULT = e; :}
+
+   |  ID:id IGUAL_IGUAL value:v   {: RESULT = new Condicion(id, "==", v); :}
+   |  ID:id DIFERENTE value:v     {: RESULT = new Condicion(id, "!=", v); :}
+   |  ID:id MAYOR value:v         {: RESULT = new Condicion(id, ">", v); :}
+   |  ID:id MENOR value:v         {: RESULT = new Condicion(id, "<", v); :}
+   |  ID:id MAYOR_IGUAL value:v   {: RESULT = new Condicion(id, ">=", v); :}
+   |  ID:id MENOR_IGUAL value:v   {: RESULT = new Condicion(id, "<=", v); :}
   ;
