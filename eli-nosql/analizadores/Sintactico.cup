@@ -92,9 +92,9 @@ non terminal ejecucion.Expresion expr;
 non terminal ejecucion.Expresion filter_decl;
 non terminal java.util.LinkedList<ejecucion.Asignacion> assign_list;
 non terminal ejecucion.Asignacion assign_elem;
+non terminal java.util.LinkedList<String> field_decl, id_list;
 
 /* AÚN NO TIPADOS (SE ACTUALIZARÁN DESPUÉS) */
-non terminal field_decl, id_list;
 non terminal array_def, val_list;
 
 /* ====== PRECEDENCIAS ====== */
@@ -134,7 +134,7 @@ stmt
   ::= use_def:u       {: RESULT = u; :}
    |  db_def:d        {: RESULT = d; :}
    |  table_def:t     {: RESULT = t; :}
-   |  read_stmt
+   | read_stmt:r      {: RESULT = r; :}
    |  export_stmt
    |  add_stmt:a      {: RESULT = a; :}
    |  update_stmt:u   {: RESULT = u; :}
@@ -225,35 +225,51 @@ type_def
    |  T_OBJECT  {: RESULT = "object"; :}
   ;
 
-/* 4. READ (SÍ lleva ';' al final de la llave) */
+/* 4. READ */
 read_stmt
-  ::= READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA PUNTO_COMA
-   |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA PUNTO_COMA
+  ::= READ ID:id LLAVE_ABRE field_decl:campos filter_decl:f LLAVE_CIERRA PUNTO_COMA
+      {: RESULT = new Leer(id, campos, f); :}
 
-   /* Faltó ';' al final del bloque */
+   |  READ ID:id LLAVE_ABRE field_decl:campos LLAVE_CIERRA PUNTO_COMA
+      {: RESULT = new Leer(id, campos, null); :}
+
+   /* ---- ZONA DE MODO PÁNICO ---- */
    |  READ ID LLAVE_ABRE field_decl filter_decl LLAVE_CIERRA:c
-      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); :}
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); RESULT = null; :}
    |  READ ID LLAVE_ABRE field_decl LLAVE_CIERRA:c
-      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); :}
-
-   /* Modo Pánico: Error interno, y SI tiene el ';' final */
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); RESULT = null; :}
    |  READ ID LLAVE_ABRE error LLAVE_CIERRA PUNTO_COMA
-
-   /* Modo Pánico: Error interno, Y TAMBIEN le falta el ';' final */
+      {: RESULT = null; :}
    |  READ ID LLAVE_ABRE error LLAVE_CIERRA:c
-      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); :}
+      {: parser.reportar_error_manual("Falta ';' al final de la instrucción 'read'", cleft, cright); RESULT = null; :}
   ;
 
 field_decl
-  ::= FIELDS DOS_PUNTOS id_list PUNTO_COMA
+  ::= FIELDS DOS_PUNTOS id_list:lista PUNTO_COMA
+      {:
+         // Devuelve la lista de campos específicos
+         RESULT = lista;
+      :}
    |  FIELDS DOS_PUNTOS ASTERISCO PUNTO_COMA
+      {:
+         // Si es un asterisco, devolvemos una lista vacía para que la clase Leer sepa que son TODOS
+         RESULT = new java.util.LinkedList<>();
+      :}
   ;
 
 id_list
-  ::= id_list COMA ID
-   |  ID
+  ::= id_list:lista COMA ID:id
+      {:
+         if(id != null) lista.add(id);
+         RESULT = lista;
+      :}
+   |  ID:id
+      {:
+         java.util.LinkedList<String> lista = new java.util.LinkedList<>();
+         if(id != null) lista.add(id);
+         RESULT = lista;
+      :}
   ;
-
 filter_decl
   ::= FILTER DOS_PUNTOS expr:e PUNTO_COMA
       {: RESULT = e; :}
