@@ -13,19 +13,27 @@ public class CrearTabla implements Instruccion {
 
     @Override
     public Object ejecutar(Entorno ent) {
-        // 1. Validar que exista una base de datos en uso (regla del manual)
-        Object dbActiva = ent.obtener("db_activa");
-
-        if (dbActiva == null) {
-            ent.imprimir(">> ERROR SEMANTICO: No se puede crear la tabla '" + this.nombreTabla + "'. No hay ninguna base de datos seleccionada (usa 'use <bd>;').");
+        // 1. Validar qué base de datos está en uso
+        Object nombreDBActiva = ent.obtener("db_activa");
+        if (nombreDBActiva == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: No se puede crear la tabla '" + this.nombreTabla + "'. No hay ninguna base de datos seleccionada (usa 'use <bd>;').");
             return null;
         }
 
-        // 2. Si todo está bien, "creamos" la tabla
-        ent.imprimir(">> EXITO: Tabla '" + this.nombreTabla + "' creada en la base de datos '" + dbActiva + "'.");
+        // 2. Extraer el objeto BaseDatos real de la memoria
+        BaseDatos bdActual = (BaseDatos) ent.obtener("DB_" + nombreDBActiva);
+        if (bdActual == null) {
+            ent.imprimir(">> ERROR FATAL: La base de datos activa no se encontró en memoria.");
+            return null;
+        }
+
+        // 3. Crear el objeto Tabla y guardarlo en la Base de Datos
+        Tabla nuevaTabla = new Tabla(this.nombreTabla, this.columnas);
+        bdActual.agregarTabla(nuevaTabla);
+
+        ent.imprimir(">> ÉXITO: Tabla '" + this.nombreTabla + "' creada y guardada físicamente en la base de datos '" + nombreDBActiva + "'.");
         ent.imprimir("   -> Columnas registradas: " + this.columnas.size());
 
-        // (Más adelante, aquí guardaremos la estructura de la tabla en el Entorno)
         return null;
     }
 }

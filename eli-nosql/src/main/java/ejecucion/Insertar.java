@@ -13,21 +13,37 @@ public class Insertar implements Instruccion {
 
     @Override
     public Object ejecutar(Entorno ent) {
-        // 1. Validar que exista una base de datos en uso
-        Object dbActiva = ent.obtener("db_activa");
-        if (dbActiva == null) {
-            ent.imprimir(">> ERROR SEMANTICO: No se puede insertar en '" + this.nombreTabla + "'. No hay BD activa.");
+        // 1. Validar la base de datos activa
+        Object nombreDBActiva = ent.obtener("db_activa");
+        if (nombreDBActiva == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: No se puede insertar en '" + this.nombreTabla + "'. No hay BD activa.");
             return null;
         }
 
-        ent.imprimir(">> EXITO: Registro insertado en la tabla '" + this.nombreTabla + "'. Datos:");
+        // 2. Obtener el objeto BaseDatos y luego buscar la Tabla
+        BaseDatos bdActual = (BaseDatos) ent.obtener("DB_" + nombreDBActiva);
+        Tabla tablaDestino = bdActual.obtenerTabla(this.nombreTabla);
 
-        // 2. Recorremos las asignaciones y RESOLVEMOS las expresiones para obtener su valor real
-        for (Asignacion asig : asignaciones) {
-            // Aquí llamamos al resolver() de la expresión (por ahora Literales)
-            Object valorReal = asig.getValor().resolver(ent);
-            ent.imprimir("   - " + asig.getCampo() + ": " + valorReal);
+        // 3. Validar que la tabla exista
+        if (tablaDestino == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: La tabla '" + this.nombreTabla + "' no existe en la base de datos '" + nombreDBActiva + "'.");
+            return null;
         }
+
+        // 4. Crear la nueva "fila" (un HashMap de Columna -> Valor)
+        java.util.HashMap<String, Object> nuevaFila = new java.util.HashMap<>();
+
+        ent.imprimir(">> ÉXITO: Guardando registro en la tabla '" + this.nombreTabla + "'. Datos:");
+
+        // 5. Recorrer las asignaciones, resolverlas y guardarlas en la fila
+        for (Asignacion asig : asignaciones) {
+            Object valorReal = asig.getValor().resolver(ent);
+            nuevaFila.put(asig.getCampo(), valorReal);
+            ent.imprimir("   - [" + asig.getCampo() + "] guardado con valor: " + valorReal);
+        }
+
+        // 6. ¡Insertar la fila en la tabla real!
+        tablaDestino.insertarRegistro(nuevaFila);
 
         return null;
     }

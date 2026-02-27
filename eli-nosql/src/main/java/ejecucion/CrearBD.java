@@ -11,11 +11,13 @@ public class CrearBD implements Instruccion {
 
     @Override
     public Object ejecutar(Entorno ent) {
-        // Registramos en memoria que esta base de datos YA EXISTE
-        // Guardamos su ruta por si la necesitamos después
-        ent.guardar("DB_" + this.nombreBD, this.rutaArchivo);
+        // 1. Instanciamos el objeto BaseDatos real
+        BaseDatos nuevaBD = new BaseDatos(this.nombreBD, this.rutaArchivo);
 
-        ent.imprimir(">> EXITO: Base de datos '" + this.nombreBD + "' definida. Persistencia en: " + this.rutaArchivo);
+        // 2. Lo guardamos en el Entorno (memoria RAM)
+        ent.guardar("DB_" + this.nombreBD, nuevaBD);
+
+        ent.imprimir(">> ÉXITO: Base de datos '" + this.nombreBD + "' estructurada en memoria. Persistencia en: " + this.rutaArchivo);
         return null;
     }
 }
