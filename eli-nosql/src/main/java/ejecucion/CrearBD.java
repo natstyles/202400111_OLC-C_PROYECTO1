@@ -15,7 +15,7 @@ public class CrearBD implements Instruccion {
         // Guardamos su ruta por si la necesitamos después
         ent.guardar("DB_" + this.nombreBD, this.rutaArchivo);
 
-        System.out.println(">> ÉXITO: Base de datos '" + this.nombreBD + "' definida. Persistencia en: " + this.rutaArchivo);
+        System.out.println(">> EXITO: Base de datos '" + this.nombreBD + "' definida. Persistencia en: " + this.rutaArchivo);
         return null;
     }
 }

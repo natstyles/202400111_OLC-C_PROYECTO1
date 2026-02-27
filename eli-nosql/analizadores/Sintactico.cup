@@ -135,10 +135,10 @@ stmt
    |  db_def:d        {: RESULT = d; :}
    |  table_def:t     {: RESULT = t; :}
    | read_stmt:r      {: RESULT = r; :}
-   |  export_stmt
+   |  export_stmt:e   {: RESULT = e; :}
    |  add_stmt:a      {: RESULT = a; :}
    |  update_stmt:u   {: RESULT = u; :}
-   |  clear_stmt
+   |  clear_stmt:c       {: RESULT = c; :}
    |  error PUNTO_COMA    {: RESULT = null; :}
    |  error LLAVE_CIERRA  {: RESULT = null; :}
   ;
@@ -277,8 +277,10 @@ filter_decl
 
 /* 5. EXPORT */
 export_stmt
-  ::= EXPORT CADENA PUNTO_COMA
+  ::= EXPORT CADENA:ruta PUNTO_COMA
+      {: RESULT = new Exportar(ruta); :}
    |  EXPORT error PUNTO_COMA
+      {: RESULT = null; :}
   ;
 
 /* 6. ADD: add <id> { campo: valor, ... }; */
@@ -354,8 +356,10 @@ assign_elem
 
 /* 8. CLEAR */
 clear_stmt
-  ::= CLEAR ID PUNTO_COMA
+  ::= CLEAR ID:id PUNTO_COMA
+      {: RESULT = new Limpiar(id); :}
    |  CLEAR error PUNTO_COMA
+      {: RESULT = null; :}
   ;
 
 /* Valores Literales (Conectados al nodo Literal.java) */

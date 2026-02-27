@@ -506,7 +506,10 @@ class CUP$Sintactico$actions {
           case 8: // stmt ::= export_stmt 
             {
               Instruccion RESULT =null;
-
+		int eleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).left;
+		int eright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).right;
+		Instruccion e = (Instruccion)((java_cup.runtime.Symbol) CUP$Sintactico$stack.peek()).value;
+		 RESULT = e; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("stmt",2, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -539,7 +542,10 @@ class CUP$Sintactico$actions {
           case 11: // stmt ::= clear_stmt 
             {
               Instruccion RESULT =null;
-
+		int cleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).left;
+		int cright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()).right;
+		Instruccion c = (Instruccion)((java_cup.runtime.Symbol) CUP$Sintactico$stack.peek()).value;
+		 RESULT = c; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("stmt",2, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -933,7 +939,10 @@ class CUP$Sintactico$actions {
           case 42: // export_stmt ::= EXPORT CADENA PUNTO_COMA 
             {
               Instruccion RESULT =null;
-
+		int rutaleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).left;
+		int rutaright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).right;
+		String ruta = (String)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).value;
+		 RESULT = new Exportar(ruta); 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("export_stmt",7, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-2)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -942,7 +951,7 @@ class CUP$Sintactico$actions {
           case 43: // export_stmt ::= EXPORT error PUNTO_COMA 
             {
               Instruccion RESULT =null;
-
+		 RESULT = null; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("export_stmt",7, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-2)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -1157,7 +1166,10 @@ class CUP$Sintactico$actions {
           case 58: // clear_stmt ::= CLEAR ID PUNTO_COMA 
             {
               Instruccion RESULT =null;
-
+		int idleft = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).left;
+		int idright = ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).right;
+		String id = (String)((java_cup.runtime.Symbol) CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-1)).value;
+		 RESULT = new Limpiar(id); 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("clear_stmt",10, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-2)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
@@ -1166,7 +1178,7 @@ class CUP$Sintactico$actions {
           case 59: // clear_stmt ::= CLEAR error PUNTO_COMA 
             {
               Instruccion RESULT =null;
-
+		 RESULT = null; 
               CUP$Sintactico$result = parser.getSymbolFactory().newSymbol("clear_stmt",10, ((java_cup.runtime.Symbol)CUP$Sintactico$stack.elementAt(CUP$Sintactico$top-2)), ((java_cup.runtime.Symbol)CUP$Sintactico$stack.peek()), RESULT);
             }
           return CUP$Sintactico$result;
