@@ -12,13 +12,13 @@ public class Exportar implements Instruccion {
     public Object ejecutar(Entorno ent) {
         Object dbActiva = ent.obtener("db_activa");
         if (dbActiva == null) {
-            System.out.println(">> ERROR SEMANTICO: No se puede exportar. No hay ninguna BD activa.");
+            ent.imprimir(">> ERROR SEMANTICO: No se puede exportar. No hay ninguna BD activa.");
             return null;
         }
 
-        System.out.println(">> EXITO: La base de datos '" + dbActiva + "' sera exportada al archivo: " + this.rutaArchivo);
+        ent.imprimir(">> EXITO: La base de datos '" + dbActiva + "' sera exportada al archivo: " + this.rutaArchivo);
 
-        // Más adelante: aquí tomarás toda la BD de la memoria y usarás GSON o Jackson para escribir el archivo JSON.
+        //tomamos BD de la memoria y usarás GSON o Jackson para escribir el archivo JSON.
         return null;
     }
 }

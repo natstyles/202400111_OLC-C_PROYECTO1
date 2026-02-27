@@ -16,17 +16,17 @@ public class Insertar implements Instruccion {
         // 1. Validar que exista una base de datos en uso
         Object dbActiva = ent.obtener("db_activa");
         if (dbActiva == null) {
-            System.out.println(">> ERROR SEMANTICO: No se puede insertar en '" + this.nombreTabla + "'. No hay BD activa.");
+            ent.imprimir(">> ERROR SEMANTICO: No se puede insertar en '" + this.nombreTabla + "'. No hay BD activa.");
             return null;
         }
 
-        System.out.println(">> EXITO: Registro insertado en la tabla '" + this.nombreTabla + "'. Datos:");
+        ent.imprimir(">> EXITO: Registro insertado en la tabla '" + this.nombreTabla + "'. Datos:");
 
         // 2. Recorremos las asignaciones y RESOLVEMOS las expresiones para obtener su valor real
         for (Asignacion asig : asignaciones) {
             // Aquí llamamos al resolver() de la expresión (por ahora Literales)
             Object valorReal = asig.getValor().resolver(ent);
-            System.out.println("   - " + asig.getCampo() + ": " + valorReal);
+            ent.imprimir("   - " + asig.getCampo() + ": " + valorReal);
         }
 
         return null;

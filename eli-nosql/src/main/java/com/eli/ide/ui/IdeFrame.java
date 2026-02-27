@@ -508,16 +508,14 @@ public class IdeFrame extends JFrame {
             } else {
                 console.append(">> Análisis completado: SIN errores.\n");
 
-                // =========================================================
-                //  INICIO DE LA EJECUCIÓN DEL ÁRBOL (AST)
-                // =========================================================
+                // INICIO DE LA EJECUCIÓN DEL ÁRBOL AST
                 console.append("\n>> --- INICIANDO EJECUCIÓN --- \n");
 
                 // Verificamos que el árbol no venga vacío
                 if (symRaiz != null && symRaiz.value != null) {
 
-                    // Creamos la memoria global (Entorno)
-                    ejecucion.Entorno entornoGlobal = new ejecucion.Entorno(null);
+                    //memoria global y conexión a UI
+                    ejecucion.Entorno entornoGlobal = new ejecucion.Entorno(null, msg -> console.append(msg + "\n"));
 
                     // Extraemos la lista de instrucciones de la raíz
                     @SuppressWarnings("unchecked")

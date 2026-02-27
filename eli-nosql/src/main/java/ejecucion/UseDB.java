@@ -14,13 +14,13 @@ public class UseDB implements Instruccion {
 
         // 2. Si nos devuelve null, significa que no existe
         if (bdExiste == null) {
-            System.out.println(">> ERROR SEMANTICO: La base de datos '" + this.nombreDB + "' no ha sido definida. Imposible seleccionarla.");
+            ent.imprimir(">> ERROR SEMANTICO: La base de datos '" + this.nombreDB + "' no ha sido definida. Imposible seleccionarla.");
             return null; // Detenemos la ejecución de esta instrucción
         }
 
         // 3. Si pasó la validación, la establecemos como activa
         ent.guardar("db_activa", this.nombreDB);
-        System.out.println(">> EXITO: Base de datos '" + this.nombreDB + "' seleccionada para su uso.");
+        ent.imprimir(">> EXITO: Base de datos '" + this.nombreDB + "' seleccionada para su uso.");
 
         return null;
     }

@@ -18,24 +18,24 @@ public class Leer implements Instruccion {
         // 1. Validar que exista una base de datos activa
         Object dbActiva = ent.obtener("db_activa");
         if (dbActiva == null) {
-            System.out.println(">> ERROR SEMANTICO: No se puede leer de '" + this.nombreTabla + "'. No hay BD activa.");
+            ent.imprimir(">> ERROR SEMANTICO: No se puede leer de '" + this.nombreTabla + "'. No hay BD activa.");
             return null;
         }
 
-        System.out.println(">> EXITO: Instruccion READ ejecutada en la tabla '" + this.nombreTabla + "'.");
+        ent.imprimir(">> EXITO: Instruccion READ ejecutada en la tabla '" + this.nombreTabla + "'.");
 
         // 2. Verificar qué columnas quiere ver el usuario
         if (campos == null || campos.isEmpty()) {
-            System.out.println("   -> Campos a mostrar: TODOS (*)");
+            ent.imprimir("   -> Campos a mostrar: TODOS (*)");
         } else {
-            System.out.println("   -> Campos a mostrar: " + campos.toString());
+            ent.imprimir("   -> Campos a mostrar: " + campos.toString());
         }
 
         // 3. Verificar si hay condiciones de filtrado
         if (this.filtro != null) {
-            System.out.println("   -> Filtro detectado. Se imprimiran solo los registros que cumplan la condicion.");
+            ent.imprimir("   -> Filtro detectado. Se imprimiran solo los registros que cumplan la condicion.");
         } else {
-            System.out.println("   -> No hay filtro. Se imprimiran TODOS los registros de la tabla.");
+            ent.imprimir("   -> No hay filtro. Se imprimiran TODOS los registros de la tabla.");
         }
 
         return null;

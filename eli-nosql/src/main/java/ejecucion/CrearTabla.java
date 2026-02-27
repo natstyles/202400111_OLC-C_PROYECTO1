@@ -17,13 +17,13 @@ public class CrearTabla implements Instruccion {
         Object dbActiva = ent.obtener("db_activa");
 
         if (dbActiva == null) {
-            System.out.println(">> ERROR SEMANTICO: No se puede crear la tabla '" + this.nombreTabla + "'. No hay ninguna base de datos seleccionada (usa 'use <bd>;').");
+            ent.imprimir(">> ERROR SEMANTICO: No se puede crear la tabla '" + this.nombreTabla + "'. No hay ninguna base de datos seleccionada (usa 'use <bd>;').");
             return null;
         }
 
         // 2. Si todo está bien, "creamos" la tabla
-        System.out.println(">> EXITO: Tabla '" + this.nombreTabla + "' creada en la base de datos '" + dbActiva + "'.");
-        System.out.println("   -> Columnas registradas: " + this.columnas.size());
+        ent.imprimir(">> EXITO: Tabla '" + this.nombreTabla + "' creada en la base de datos '" + dbActiva + "'.");
+        ent.imprimir("   -> Columnas registradas: " + this.columnas.size());
 
         // (Más adelante, aquí guardaremos la estructura de la tabla en el Entorno)
         return null;
