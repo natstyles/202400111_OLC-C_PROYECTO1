@@ -16,28 +16,61 @@ public class Leer implements Instruccion {
     @Override
     public Object ejecutar(Entorno ent) {
         // 1. Validar que exista una base de datos activa
-        Object dbActiva = ent.obtener("db_activa");
-        if (dbActiva == null) {
-            ent.imprimir(">> ERROR SEMANTICO: No se puede leer de '" + this.nombreTabla + "'. No hay BD activa.");
+        Object nombreDBActiva = ent.obtener("db_activa");
+        if (nombreDBActiva == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: No se puede leer. No hay BD activa.");
             return null;
         }
 
-        ent.imprimir(">> EXITO: Instruccion READ ejecutada en la tabla '" + this.nombreTabla + "'.");
+        // 2. Extraer la Base de Datos y buscar la Tabla
+        BaseDatos bdActual = (BaseDatos) ent.obtener("DB_" + nombreDBActiva);
+        Tabla tablaDestino = bdActual.obtenerTabla(this.nombreTabla);
 
-        // 2. Verificar qué columnas quiere ver el usuario
-        if (campos == null || campos.isEmpty()) {
-            ent.imprimir("   -> Campos a mostrar: TODOS (*)");
-        } else {
-            ent.imprimir("   -> Campos a mostrar: " + campos.toString());
+        // 3. Validar que la tabla exista en la memoria
+        if (tablaDestino == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: La tabla '" + this.nombreTabla + "' no existe en la base de datos '" + nombreDBActiva + "'.");
+            return null;
         }
 
-        // 3. Verificar si hay condiciones de filtrado
-        if (this.filtro != null) {
-            ent.imprimir("   -> Filtro detectado. Se imprimiran solo los registros que cumplan la condicion.");
-        } else {
-            ent.imprimir("   -> No hay filtro. Se imprimiran TODOS los registros de la tabla.");
+        ent.imprimir(">> ÉXITO: Leyendo datos de la tabla '" + this.nombreTabla + "'...");
+
+        // 4. Extraer las filas (registros) de la tabla
+        java.util.LinkedList<java.util.HashMap<String, Object>> filas = tablaDestino.getRegistros();
+
+        if (filas.isEmpty()) {
+            ent.imprimir("   -> La tabla está vacía.");
+            return null;
         }
 
+        // 5. Imprimir cada fila
+        int contador = 1;
+        for (java.util.HashMap<String, Object> fila : filas) {
+            StringBuilder resultadoFila = new StringBuilder("   Fila " + contador + ": { ");
+
+            if (campos == null || campos.isEmpty()) {
+                // Si pidieron todos los campos (*)
+                for (String columna : fila.keySet()) {
+                    resultadoFila.append(columna).append(": ").append(fila.get(columna)).append(", ");
+                }
+            } else {
+                // Si pidieron campos específicos (ej. fields: id, nombre;)
+                for (String campoReq : campos) {
+                    if (fila.containsKey(campoReq)) {
+                        resultadoFila.append(campoReq).append(": ").append(fila.get(campoReq)).append(", ");
+                    }
+                }
+            }
+
+            // Un poco de formato para quitar la última coma y cerrar la llave
+            String res = resultadoFila.toString();
+            if (res.endsWith(", ")) res = res.substring(0, res.length() - 2);
+            res += " }";
+
+            ent.imprimir(res);
+            contador++;
+        }
+
+        // (La lógica del filtro la integraremos en el siguiente paso)
         return null;
     }
 }
