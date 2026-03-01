@@ -1,24 +1,50 @@
 package ejecucion;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import java.io.FileWriter;
+import java.io.IOException;
+
 public class Exportar implements Instruccion {
     private String rutaArchivo;
 
     public Exportar(String rutaArchivo) {
-        // Le quitamos las comillas a la cadena si es que viene con ellas desde el lexer
         this.rutaArchivo = rutaArchivo.replace("\"", "");
     }
 
     @Override
     public Object ejecutar(Entorno ent) {
-        Object dbActiva = ent.obtener("db_activa");
-        if (dbActiva == null) {
-            ent.imprimir(">> ERROR SEMANTICO: No se puede exportar. No hay ninguna BD activa.");
+        // 1. Validar que exista una base de datos en uso
+        Object nombreDBActiva = ent.obtener("db_activa");
+        if (nombreDBActiva == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: No se puede exportar. No hay ninguna BD activa.");
             return null;
         }
 
-        ent.imprimir(">> EXITO: La base de datos '" + dbActiva + "' sera exportada al archivo: " + this.rutaArchivo);
+        // 2. Extraer el objeto BaseDatos real de la memoria
+        BaseDatos bdActual = (BaseDatos) ent.obtener("DB_" + nombreDBActiva);
+        if (bdActual == null) {
+            ent.imprimir(">> ERROR FATAL: No se encontró la estructura de la base de datos en memoria.");
+            return null;
+        }
 
-        //tomamos BD de la memoria y usarás GSON o Jackson para escribir el archivo JSON.
+        // 3. Convertir el objeto a JSON y guardarlo en el archivo
+        try {
+            // Configuramos Gson para que el JSON salga ordenado y legible (Pretty Printing)
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+            // Escribimos el objeto directamente en el disco duro
+            FileWriter writer = new FileWriter(this.rutaArchivo);
+            gson.toJson(bdActual, writer);
+            writer.close();
+
+            ent.imprimir(">> ÉXITO: La base de datos '" + nombreDBActiva + "' fue exportada a: " + this.rutaArchivo);
+
+        } catch (IOException e) {
+            ent.imprimir(">> ERROR DE ARCHIVO: No se pudo escribir en la ruta: " + this.rutaArchivo);
+            e.printStackTrace();
+        }
+
         return null;
     }
 }
