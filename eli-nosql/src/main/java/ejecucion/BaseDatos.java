@@ -1,28 +1,51 @@
 package ejecucion;
 
+import com.google.gson.annotations.SerializedName;
 import java.util.HashMap;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import java.io.FileWriter;
 
 public class BaseDatos {
-    private String nombre;
-    private String ruta;
-    // Usamos un HashMap para buscar tablas rápidamente por su nombre (O(1))
-    private HashMap<String, Tabla> tablas;
+
+    @SerializedName("database") // El manual exige que la llave se llame "database"
+    private String database;
+
+    // transient significa que Gson NO lo pondrá en el archivo JSON
+    private transient String ruta;
+
+    @SerializedName("tables") // El manual exige "tables"
+    private HashMap<String, Tabla> tables;
 
     public BaseDatos(String nombre, String ruta) {
-        this.nombre = nombre;
+        this.database = nombre;
         this.ruta = ruta;
-        this.tablas = new HashMap<>();
+        this.tables = new HashMap<>();
     }
 
-    public String getNombre() { return nombre; }
+    public String getNombre() { return database; }
     public String getRuta() { return ruta; }
-    public HashMap<String, Tabla> getTablas() { return tablas; }
+    public HashMap<String, Tabla> getTablas() { return tables; }
 
     public void agregarTabla(Tabla tabla) {
-        this.tablas.put(tabla.getNombre(), tabla);
+        this.tables.put(tabla.getNombre(), tabla);
     }
 
     public Tabla obtenerTabla(String nombreTabla) {
-        return this.tablas.get(nombreTabla);
+        return this.tables.get(nombreTabla);
+    }
+
+    public void autoGuardar() {
+        if (this.ruta == null || this.ruta.isEmpty()) return;
+
+        try {
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            FileWriter writer = new FileWriter(this.ruta);
+            gson.toJson(this, writer);
+            writer.close();
+        } catch (Exception e) {
+            System.out.println(">> ERROR FATAL DE PERSISTENCIA: No se pudo guardar el archivo " + this.ruta);
+            e.printStackTrace();
+        }
     }
 }

@@ -1,26 +1,37 @@
 package ejecucion;
 
-import java.util.HashMap;
+import com.google.gson.annotations.SerializedName;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.HashMap;
 
 public class Tabla {
-    private String nombre;
-    private LinkedList<Columna> columnas;
-    // Cada fila será un HashMap donde la llave es el nombre de la columna y el Object es el valor
-    private LinkedList<HashMap<String, Object>> registros;
+    // transient para que no salga en el JSON (ya que la llave del diccionario ya tiene el nombre)
+    private transient String nombre;
+
+    @SerializedName("schema")
+    private LinkedHashMap<String, String> schema;
+
+    @SerializedName("records")
+    private LinkedList<HashMap<String, Object>> records;
 
     public Tabla(String nombre, LinkedList<Columna> columnas) {
         this.nombre = nombre;
-        this.columnas = columnas;
-        this.registros = new LinkedList<>();
+        this.schema = new LinkedHashMap<>();
+
+        // Convertimos la lista de columnas al formato {"columna": "tipo"} que pide el manual
+        for(Columna col : columnas) {
+            this.schema.put(col.getNombre(), col.getTipo());
+        }
+
+        this.records = new LinkedList<>();
     }
 
     public String getNombre() { return nombre; }
-    public LinkedList<Columna> getColumnas() { return columnas; }
-    public LinkedList<HashMap<String, Object>> getRegistros() { return registros; }
+    public LinkedHashMap<String, String> getSchema() { return schema; }
+    public LinkedList<HashMap<String, Object>> getRegistros() { return records; }
 
-    // Método para insertar una nueva fila
     public void insertarRegistro(HashMap<String, Object> fila) {
-        this.registros.add(fila);
+        this.records.add(fila);
     }
 }

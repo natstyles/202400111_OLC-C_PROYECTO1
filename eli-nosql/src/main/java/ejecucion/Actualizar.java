@@ -15,33 +15,52 @@ public class Actualizar implements Instruccion {
 
     @Override
     public Object ejecutar(Entorno ent) {
-        // 1. Validar que exista una base de datos en uso
-        Object dbActiva = ent.obtener("db_activa");
-        if (dbActiva == null) {
-            ent.imprimir(">> ERROR SEMANTICO: No se puede actualizar en '" + this.nombreTabla + "'. No hay BD activa.");
+        Object nombreDBActiva = ent.obtener("db_activa");
+        if (nombreDBActiva == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: No hay BD activa para actualizar.");
             return null;
         }
 
-        ent.imprimir(">> EXITO: Instrucción UPDATE ejecutada en la tabla '" + this.nombreTabla + "'.");
+        BaseDatos bdActual = (BaseDatos) ent.obtener("DB_" + nombreDBActiva);
+        Tabla tablaDestino = bdActual.obtenerTabla(this.nombreTabla);
 
-        // 2. Comprobar si hay un filtro o si afecta a toda la tabla
-        if (this.filtro != null) {
-            ent.imprimir("   -> Filtro detectado. Se buscarán los registros que cumplan la condición.");
-            // NOTA PARA EL FUTURO: Aquí es donde recorrerás el arreglo de tu tabla,
-            // meterás la fila en un Entorno temporal y harás:
-            // if ((boolean) this.filtro.resolver(entornoTemporal)) { /* Actualizar fila */ }
-        } else {
-            ent.imprimir("   -> ADVERTENCIA: No hay filtro. Se actualizaran TODOS los registros.");
+        if (tablaDestino == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: La tabla '" + this.nombreTabla + "' no existe.");
+            return null;
         }
 
-        // 3. Mostrar qué valores se van a sobreescribir
-        ent.imprimir("   -> Valores a asignar:");
-        for (Asignacion asig : asignaciones) {
-            // Resolvemos la expresión para obtener su valor real
-            Object valorNuevo = asig.getValor().resolver(ent);
-            System.out.println("      - " + asig.getCampo() + " = " + valorNuevo);
-        }
+        java.util.LinkedList<java.util.HashMap<String, Object>> filas = tablaDestino.getRegistros();
+        int filasAfectadas = 0;
 
+        // Recorremos todas las filas de la tabla
+        for (java.util.HashMap<String, Object> fila : filas) {
+            boolean cumpleFiltro = true;
+
+            // Evaluamos el filtro si es que existe
+            if (this.filtro != null) {
+                Entorno entornoFila = new Entorno(ent, null);
+                for (String nombreColumna : fila.keySet()) {
+                    entornoFila.guardar(nombreColumna, fila.get(nombreColumna));
+                }
+
+                Object resultadoFiltro = this.filtro.resolver(entornoFila);
+                if (resultadoFiltro instanceof Boolean && !(Boolean)resultadoFiltro) {
+                    cumpleFiltro = false; // No pasó el filtro, no la actualizamos
+                }
+            }
+
+            // Si pasó el filtro (o si no había filtro), sobreescribimos los datos
+            if (cumpleFiltro) {
+                for (Asignacion asig : asignaciones) {
+                    Object valorNuevo = asig.getValor().resolver(ent);
+                    // Actualizamos el valor en el HashMap de esta fila específica
+                    fila.put(asig.getCampo(), valorNuevo);
+                }
+                filasAfectadas++;
+            }
+        }
+        bdActual.autoGuardar();
+        ent.imprimir(">> ÉXITO: Instrucción UPDATE ejecutada en '" + this.nombreTabla + "'. Filas actualizadas: " + filasAfectadas);
         return null;
     }
 }

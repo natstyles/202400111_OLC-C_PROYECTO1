@@ -30,6 +30,7 @@ public class CrearTabla implements Instruccion {
         // 3. Crear el objeto Tabla y guardarlo en la Base de Datos
         Tabla nuevaTabla = new Tabla(this.nombreTabla, this.columnas);
         bdActual.agregarTabla(nuevaTabla);
+        bdActual.autoGuardar();
 
         ent.imprimir(">> ÉXITO: Tabla '" + this.nombreTabla + "' creada y guardada físicamente en la base de datos '" + nombreDBActiva + "'.");
         ent.imprimir("   -> Columnas registradas: " + this.columnas.size());

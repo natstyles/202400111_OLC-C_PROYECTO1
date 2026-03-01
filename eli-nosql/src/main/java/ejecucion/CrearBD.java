@@ -41,6 +41,7 @@ public class CrearBD implements Instruccion {
             // 2. Si no existe, creamos una nueva base de datos vacía (como lo hacíamos antes)
             BaseDatos nuevaBD = new BaseDatos(this.nombreBD, this.rutaArchivo);
             ent.guardar("DB_" + this.nombreBD, nuevaBD);
+            nuevaBD.autoGuardar();
             ent.imprimir(">> ÉXITO: Base de datos '" + this.nombreBD + "' CREADA. Persistencia asignada a: " + this.rutaArchivo);
         }
 

@@ -1,0 +1,13 @@
+{
+  "table": "productos",
+  "fields": {
+    "nombre": "string",
+    "precio": "float"
+  },
+  "records": [
+    {
+      "precio": 850.5,
+      "nombre": "Laptop"
+    }
+  ]
+}

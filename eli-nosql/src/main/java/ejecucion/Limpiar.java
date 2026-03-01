@@ -9,16 +9,25 @@ public class Limpiar implements Instruccion {
 
     @Override
     public Object ejecutar(Entorno ent) {
-        // 1. Validar que exista una base de datos activa
-        Object dbActiva = ent.obtener("db_activa");
-        if (dbActiva == null) {
-            ent.imprimir(">> ERROR SEMÁNTICO: No se puede vaciar la tabla '" + this.nombreTabla + "'. No hay BD activa.");
+        Object nombreDBActiva = ent.obtener("db_activa");
+        if (nombreDBActiva == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: No se puede vaciar la tabla. No hay BD activa.");
             return null;
         }
 
-        ent.imprimir(">> EXITO: Instrucción CLEAR ejecutada. Todos los registros de la tabla '" + this.nombreTabla + "' seran eliminados.");
+        BaseDatos bdActual = (BaseDatos) ent.obtener("DB_" + nombreDBActiva);
+        Tabla tablaDestino = bdActual.obtenerTabla(this.nombreTabla);
 
-        // Más adelante: aquí buscarás la tabla en el Entorno y vaciarás su LinkedList de registros.
+        if (tablaDestino == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: La tabla '" + this.nombreTabla + "' no existe en la BD.");
+            return null;
+        }
+
+        // ¡Vaciamos la lista completa de registros!
+        tablaDestino.getRegistros().clear();
+        bdActual.autoGuardar();
+
+        ent.imprimir(">> ÉXITO: Instrucción CLEAR ejecutada. La tabla '" + this.nombreTabla + "' ha sido vaciada por completo.");
         return null;
     }
 }

@@ -14,33 +14,26 @@ public class Exportar implements Instruccion {
 
     @Override
     public Object ejecutar(Entorno ent) {
-        // 1. Validar que exista una base de datos en uso
-        Object nombreDBActiva = ent.obtener("db_activa");
-        if (nombreDBActiva == null) {
-            ent.imprimir(">> ERROR SEMÁNTICO: No se puede exportar. No hay ninguna BD activa.");
+        // 1. Buscamos en la memoria si se ejecutó un READ anteriormente
+        Object consultaPrevia = ent.obtener("ultima_consulta");
+
+        if (consultaPrevia == null) {
+            ent.imprimir(">> ERROR SEMÁNTICO: No hay ninguna consulta previa (read) para exportar.");
             return null;
         }
 
-        // 2. Extraer el objeto BaseDatos real de la memoria
-        BaseDatos bdActual = (BaseDatos) ent.obtener("DB_" + nombreDBActiva);
-        if (bdActual == null) {
-            ent.imprimir(">> ERROR FATAL: No se encontró la estructura de la base de datos en memoria.");
-            return null;
-        }
-
-        // 3. Convertir el objeto a JSON y guardarlo en el archivo
+        // 2. Convertimos el objeto ResultadoConsulta a JSON
         try {
-            // Configuramos Gson para que el JSON salga ordenado y legible (Pretty Printing)
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            com.google.gson.Gson gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
+            java.io.FileWriter writer = new java.io.FileWriter(this.rutaArchivo);
 
-            // Escribimos el objeto directamente en el disco duro
-            FileWriter writer = new FileWriter(this.rutaArchivo);
-            gson.toJson(bdActual, writer);
+            // Le pasamos la consulta en lugar de la base de datos completa
+            gson.toJson(consultaPrevia, writer);
             writer.close();
 
-            ent.imprimir(">> ÉXITO: La base de datos '" + nombreDBActiva + "' fue exportada a: " + this.rutaArchivo);
+            ent.imprimir(">> ÉXITO: Consulta exportada con el formato oficial a: " + this.rutaArchivo);
 
-        } catch (IOException e) {
+        } catch (java.io.IOException e) {
             ent.imprimir(">> ERROR DE ARCHIVO: No se pudo escribir en la ruta: " + this.rutaArchivo);
             e.printStackTrace();
         }

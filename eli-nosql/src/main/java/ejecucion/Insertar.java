@@ -44,6 +44,7 @@ public class Insertar implements Instruccion {
 
         // 6. ¡Insertar la fila en la tabla real!
         tablaDestino.insertarRegistro(nuevaFila);
+        bdActual.autoGuardar();
 
         return null;
     }

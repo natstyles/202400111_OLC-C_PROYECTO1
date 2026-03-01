@@ -13,19 +13,30 @@ public class Condicion implements Expresion {
 
     @Override
     public Object resolver(Entorno ent) {
-        // 1. Obtenemos el valor actual del campo en la memoria (fila actual)
+        // 1. Obtenemos el valor actual del campo en la memoria
         Object valorCampo = ent.obtener(this.campo);
 
         // 2. Resolvemos el valor literal contra el que vamos a comparar
         Object valorAComparar = this.valor.resolver(ent);
 
-        // 3. Evaluamos (Por ahora solo haremos el '==' para probar)
-        if (this.operador.equals("==")) {
-            // Convertimos a String para hacer una comparación rápida y segura en Java
-            return String.valueOf(valorCampo).equals(String.valueOf(valorAComparar));
+        if (valorCampo == null || valorAComparar == null) {
+            return false;
         }
 
-        // Más adelante agregaremos aquí los '>', '<', '!=', etc.
+        // 3. Evaluamos la igualdad (==)
+        if (this.operador.equals("==")) {
+            try {
+                // Intentamos convertirlos a números decimales para compararlos matemáticamente
+                double numCampo = Double.parseDouble(valorCampo.toString());
+                double numComparar = Double.parseDouble(valorAComparar.toString());
+                return numCampo == numComparar; // ¡Aquí 101 será igual a 101.0!
+            } catch (NumberFormatException e) {
+                // Si da error, significa que no son números (ej. "Laptop"), así que los comparamos como texto
+                return String.valueOf(valorCampo).equals(String.valueOf(valorAComparar));
+            }
+        }
+
+        // (Aquí puedes agregar después el !=, >, < usando la misma lógica del try-catch)
         return false;
     }
 }
