@@ -42,18 +42,40 @@ public class Leer implements Instruccion {
             return null;
         }
 
-        // 5. Imprimir cada fila
+// 5. Recorrer, Filtrar e Imprimir cada fila
         int contador = 1;
         for (java.util.HashMap<String, Object> fila : filas) {
+
+            //FILTRAMOS
+            if (this.filtro != null) {
+                // Creamos un entorno temporal (hijo del entorno global)
+                Entorno entornoFila = new Entorno(ent, null);
+
+                // Cargamos todas las columnas de esta fila como si fueran variables
+                for (String nombreColumna : fila.keySet()) {
+                    entornoFila.guardar(nombreColumna, fila.get(nombreColumna));
+                }
+
+                // Le pedimos a la condición que se evalúe usando los datos de esta fila
+                Object resultadoFiltro = this.filtro.resolver(entornoFila);
+
+                // Si el filtro devuelve falso, saltamos a la siguiente fila ignorando esta
+                if (resultadoFiltro instanceof Boolean && !(Boolean)resultadoFiltro) {
+                    continue;
+                }
+            }
+            //TERMINA FILTRO
+
+            // Si llegamos aquí, es porque NO HAY FILTRO o la fila SÍ CUMPLIÓ la condición
             StringBuilder resultadoFila = new StringBuilder("   Fila " + contador + ": { ");
 
             if (campos == null || campos.isEmpty()) {
-                // Si pidieron todos los campos (*)
+                // Todos los campos (*)
                 for (String columna : fila.keySet()) {
                     resultadoFila.append(columna).append(": ").append(fila.get(columna)).append(", ");
                 }
             } else {
-                // Si pidieron campos específicos (ej. fields: id, nombre;)
+                // Campos específicos
                 for (String campoReq : campos) {
                     if (fila.containsKey(campoReq)) {
                         resultadoFila.append(campoReq).append(": ").append(fila.get(campoReq)).append(", ");
@@ -61,7 +83,6 @@ public class Leer implements Instruccion {
                 }
             }
 
-            // Un poco de formato para quitar la última coma y cerrar la llave
             String res = resultadoFila.toString();
             if (res.endsWith(", ")) res = res.substring(0, res.length() - 2);
             res += " }";
