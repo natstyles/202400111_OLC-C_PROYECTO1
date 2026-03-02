@@ -13,30 +13,51 @@ public class Condicion implements Expresion {
 
     @Override
     public Object resolver(Entorno ent) {
-        // 1. Obtenemos el valor actual del campo en la memoria
+        // 1. Obtenemos el valor actual de la columna en la memoria
         Object valorCampo = ent.obtener(this.campo);
 
         // 2. Resolvemos el valor literal contra el que vamos a comparar
         Object valorAComparar = this.valor.resolver(ent);
 
+        // Validación de seguridad por si algún campo viene nulo
         if (valorCampo == null || valorAComparar == null) {
+            if (this.operador.equals("!=")) return true; // Si uno es nulo y el otro no, son diferentes
             return false;
         }
 
-        // 3. Evaluamos la igualdad (==)
-        if (this.operador.equals("==")) {
-            try {
-                // Intentamos convertirlos a números decimales para compararlos matemáticamente
-                double numCampo = Double.parseDouble(valorCampo.toString());
-                double numComparar = Double.parseDouble(valorAComparar.toString());
-                return numCampo == numComparar; // ¡Aquí 101 será igual a 101.0!
-            } catch (NumberFormatException e) {
-                // Si da error, significa que no son números (ej. "Laptop"), así que los comparamos como texto
-                return String.valueOf(valorCampo).equals(String.valueOf(valorAComparar));
+        try {
+            // INTENTO 1: Comparación Matemática (Para int y float)
+            double numCampo = Double.parseDouble(valorCampo.toString());
+            double numComparar = Double.parseDouble(valorAComparar.toString());
+
+            switch(this.operador) {
+                case "==": return numCampo == numComparar;
+                case "!=": return numCampo != numComparar;
+                case ">":  return numCampo > numComparar;
+                case "<":  return numCampo < numComparar;
+                case ">=": return numCampo >= numComparar;
+                case "<=": return numCampo <= numComparar;
+            }
+
+        } catch (NumberFormatException e) {
+            // INTENTO 2: Comparación de Texto (Para strings o booleanos)
+            String strCampo = String.valueOf(valorCampo);
+            String strComparar = String.valueOf(valorAComparar);
+
+            // El método compareTo devuelve 0 si son iguales,
+            // un positivo si el primero es alfabéticamente mayor, y un negativo si es menor.
+            int comparacion = strCampo.compareTo(strComparar);
+
+            switch(this.operador) {
+                case "==": return strCampo.equals(strComparar);
+                case "!=": return !strCampo.equals(strComparar);
+                case ">":  return comparacion > 0;
+                case "<":  return comparacion < 0;
+                case ">=": return comparacion >= 0;
+                case "<=": return comparacion <= 0;
             }
         }
 
-        // (Aquí puedes agregar después el !=, >, < usando la misma lógica del try-catch)
         return false;
     }
 }
