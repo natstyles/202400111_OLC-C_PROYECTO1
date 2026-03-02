@@ -384,9 +384,9 @@ val_list
 
 /* Expresiones Lógicas y Relacionales */
 expr
-  ::= expr:i OR expr:d            {: RESULT = new Logica(i, "OR", d); :}
-   |  expr:i AND expr:d           {: RESULT = new Logica(i, "AND", d); :}
-   |  NOT expr:d                  {: RESULT = new Logica(null, "NOT", d); :}
+  ::= expr:i OR expr:d            {: RESULT = new Logica(i, "||", d); :}
+   |  expr:i AND expr:d           {: RESULT = new Logica(i, "&&", d); :}
+   |  NOT expr:d                  {: RESULT = new Logica(null, "!", d); :}
    |  PAR_ABRE expr:e PAR_CIERRA  {: RESULT = e; :}
 
    |  ID:id IGUAL_IGUAL value:v   {: RESULT = new Condicion(id, "==", v); :}

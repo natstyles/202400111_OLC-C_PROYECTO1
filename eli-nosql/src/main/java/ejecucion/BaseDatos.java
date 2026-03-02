@@ -1,20 +1,19 @@
 package ejecucion;
 
 import com.google.gson.annotations.SerializedName;
-import java.util.HashMap;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.FileWriter;
+import java.util.HashMap;
 
 public class BaseDatos {
 
-    @SerializedName("database") // El manual exige que la llave se llame "database"
+    @SerializedName("database")
     private String database;
 
-    // transient significa que Gson NO lo pondrá en el archivo JSON
     private transient String ruta;
 
-    @SerializedName("tables") // El manual exige "tables"
+    @SerializedName("tables")
     private HashMap<String, Tabla> tables;
 
     public BaseDatos(String nombre, String ruta) {
@@ -25,19 +24,28 @@ public class BaseDatos {
 
     public String getNombre() { return database; }
     public String getRuta() { return ruta; }
-    public HashMap<String, Tabla> getTablas() { return tables; }
 
+    //Setter para devolverle la ruta después de cargarla ---
+    public void setRuta(String ruta) { this.ruta = ruta; }
+
+    public HashMap<String, Tabla> getTablas() {
+        if (this.tables == null) this.tables = new HashMap<>();
+        return tables;
+    }
+
+    // --- NUEVO: Blindaje anti-NullPointerException ---
     public void agregarTabla(Tabla tabla) {
+        if (this.tables == null) this.tables = new HashMap<>();
         this.tables.put(tabla.getNombre(), tabla);
     }
 
     public Tabla obtenerTabla(String nombreTabla) {
+        if (this.tables == null) this.tables = new HashMap<>();
         return this.tables.get(nombreTabla);
     }
 
     public void autoGuardar() {
         if (this.ruta == null || this.ruta.isEmpty()) return;
-
         try {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             FileWriter writer = new FileWriter(this.ruta);

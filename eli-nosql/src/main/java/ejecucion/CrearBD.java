@@ -21,15 +21,20 @@ public class CrearBD implements Instruccion {
         // 1. Verificamos si el archivo ya existe en el disco duro
         if (archivo.exists()) {
             try {
-                // Si existe, leemos el archivo y Gson hace la "magia inversa" (Deserialización)
                 Gson gson = new Gson();
                 FileReader reader = new FileReader(archivo);
 
-                // Le decimos a Gson que convierta el texto del JSON a nuestro objeto BaseDatos
                 BaseDatos bdCargada = gson.fromJson(reader, BaseDatos.class);
                 reader.close();
 
-                // Guardamos la base de datos recuperada en la memoria RAM
+                //Le devolvemos la ruta porque Gson la ignoró al ser transient
+                if (bdCargada != null) {
+                    bdCargada.setRuta(this.rutaArchivo);
+                } else {
+                    // Si el JSON estaba completamente vacío/corrupto, creamos una nueva
+                    bdCargada = new BaseDatos(this.nombreBD, this.rutaArchivo);
+                }
+
                 ent.guardar("DB_" + this.nombreBD, bdCargada);
                 ent.imprimir(">> ÉXITO: Base de datos '" + this.nombreBD + "' CARGADA desde el archivo: " + this.rutaArchivo);
 
