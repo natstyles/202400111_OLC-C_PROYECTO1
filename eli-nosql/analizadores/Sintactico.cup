@@ -93,9 +93,10 @@ non terminal ejecucion.Expresion filter_decl;
 non terminal java.util.LinkedList<ejecucion.Asignacion> assign_list;
 non terminal ejecucion.Asignacion assign_elem;
 non terminal java.util.LinkedList<String> field_decl, id_list;
-
-/* AÚN NO TIPADOS (SE ACTUALIZARÁN DESPUÉS) */
-non terminal array_def, val_list;
+non terminal Expresion array_def;
+non terminal LinkedList<Expresion> val_list;
+non terminal Expresion object_def;
+non terminal LinkedList<Asignacion> obj_prop_list;
 
 /* ====== PRECEDENCIAS ====== */
 precedence left OR;
@@ -370,16 +371,31 @@ value
    |  TRUE      {: RESULT = new Literal(true, "bool"); :}
    |  FALSE     {: RESULT = new Literal(false, "bool"); :}
    |  NULL      {: RESULT = new Literal(null, "null"); :}
+
+   |  array_def:a     {: RESULT = a; :}
+   |  object_def:o    {: RESULT = o; :}
   ;
 
 array_def
-  ::= COR_ABRE val_list COR_CIERRA
-   |  COR_ABRE COR_CIERRA
+  ::= COR_ABRE val_list:lista COR_CIERRA    {: RESULT = new Arreglo(lista); :}
+   |  COR_ABRE COR_CIERRA                   {: RESULT = new Arreglo(new LinkedList<Expresion>()); :}
   ;
 
 val_list
-  ::= val_list COMA value
-   |  value
+  ::= val_list:l COMA value:v                {: l.add(v); RESULT = l; :}
+   |  value:v                                {: LinkedList<Expresion> l = new LinkedList<>(); l.add(v); RESULT = l; :}
+  ;
+
+object_def
+  ::= LLAVE_ABRE obj_prop_list:lista LLAVE_CIERRA   {: RESULT = new Objeto(lista); :}
+   |  LLAVE_ABRE LLAVE_CIERRA                       {: RESULT = new Objeto(new LinkedList<Asignacion>()); :}
+  ;
+
+obj_prop_list
+  ::= obj_prop_list:l COMA ID:id DOS_PUNTOS value:v
+      {: l.add(new Asignacion(id, v)); RESULT = l; :}
+   |  ID:id DOS_PUNTOS value:v
+      {: LinkedList<Asignacion> l = new LinkedList<>(); l.add(new Asignacion(id, v)); RESULT = l; :}
   ;
 
 /* Expresiones Lógicas y Relacionales */
